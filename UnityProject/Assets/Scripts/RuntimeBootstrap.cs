@@ -8,6 +8,13 @@ namespace TikTokLiveGame
         private static void StartGame()
         {
             if (Object.FindFirstObjectByType<TikTokGameController>() != null) return;
+            string welcomeDirectory = VisualCaptureHarness.ParseWelcomeDirectory(System.Environment.GetCommandLineArgs(), out string argumentError);
+            if (argumentError != null)
+            {
+                Debug.LogError(argumentError);
+                Application.Quit(2);
+                return;
+            }
             // TikTok LIVE Studio captures at 60 FPS. Disable display-rate VSync so
             // high-refresh monitors cannot force uneven 60 FPS capture cadence.
             QualitySettings.vSyncCount = 0;
@@ -18,14 +25,14 @@ namespace TikTokLiveGame
 
             GameObject root = new("TikTok Live Game");
             AvatarService avatars = root.AddComponent<AvatarService>();
-            TikTokWebSocketClient client = root.AddComponent<TikTokWebSocketClient>();
+            TikTokWebSocketClient client = welcomeDirectory == null ? root.AddComponent<TikTokWebSocketClient>() : null;
             PlayerManager players = new GameObject("Players").AddComponent<PlayerManager>();
             players.transform.SetParent(root.transform);
             GiftEffectManager giftEffects = root.AddComponent<GiftEffectManager>();
             root.AddComponent<MusicPlaylistPlayer>();
             TikTokGameController game = root.AddComponent<TikTokGameController>();
             game.Initialize(client, players, giftEffects);
-            VisualCaptureHarness.InstallIfRequested(root);
+            VisualCaptureHarness.InstallIfRequested(root, welcomeDirectory);
         }
     }
 }

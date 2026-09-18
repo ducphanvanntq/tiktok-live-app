@@ -7,6 +7,23 @@ namespace TikTokLiveGame
         private const int FloorLightingLayer = 8;
         private const float DjBoothHeightOffset = 0.85f;
 
+        internal static Texture2D CreateBackgroundTexture(Texture2D source)
+        {
+            source = source != null ? source : Texture2D.blackTexture;
+            // Resources textures can discard their CPU pixels. Copy on the GPU
+            // so the owned sampler works for non-readable/compressed assets too.
+            Texture2D copy = new(source.width, source.height, source.format, source.mipmapCount > 1,
+                !UnityEngine.Experimental.Rendering.GraphicsFormatUtility.IsSRGBFormat(source.graphicsFormat));
+            copy.Apply(false, true);
+            Graphics.CopyTexture(source, copy);
+            copy.name = "OlaChat runtime background";
+            copy.hideFlags = HideFlags.DontSave;
+            copy.filterMode = FilterMode.Trilinear;
+            copy.anisoLevel = 8;
+            copy.wrapMode = TextureWrapMode.Mirror;
+            return copy;
+        }
+
         public static void Build()
         {
             RenderSettings.ambientLight = new Color(0.15f, 0.02f, 0.05f);
@@ -32,16 +49,29 @@ namespace TikTokLiveGame
 
             // CreateArchitecturalBackdrop(); // Hide acoustic wall and panels
 
-            Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-            string path = @"D:\TIKTOK_LIVE_BAR\LiveAssets\nenamphu.png";
+            Texture2D tex = Resources.Load<Texture2D>("Backgrounds/olachat-background-v3");
+            Texture2D bundledTexture = tex;
+            // Keep the existing optional OlaChat override beside the executable.
+            string path = System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "..", "olachat2.png"));
             if (System.IO.File.Exists(path))
             {
-                tex.LoadImage(System.IO.File.ReadAllBytes(path));
-                tex.filterMode = FilterMode.Trilinear;
-                tex.anisoLevel = 8;
-                tex.wrapMode = TextureWrapMode.Mirror;
-                tex.Apply();
+                Texture2D custom = new(2, 2, TextureFormat.RGBA32, false) { name = "OlaChat override" };
+                try
+                {
+                    if (custom.LoadImage(System.IO.File.ReadAllBytes(path))) tex = custom;
+                    else Object.Destroy(custom);
+                }
+                catch (System.Exception exception)
+                {
+                    Object.Destroy(custom);
+                    Debug.LogWarning($"Cannot load background override: {exception.Message}");
+                }
             }
+            // Own the sampler state. Neither Resources assets nor engine-owned
+            // blackTexture may be changed by a scene's material preferences.
+            Texture2D ownedTexture = CreateBackgroundTexture(tex);
+            if (tex != null && tex != bundledTexture) Object.Destroy(tex);
+            tex = ownedTexture;
             Shader bgShader = Shader.Find("Unlit/Texture");
             if (bgShader == null) bgShader = Shader.Find("Sprites/Default");
             Material bgMat = new Material(bgShader);
@@ -68,6 +98,7 @@ namespace TikTokLiveGame
             ceilingMat.mainTextureOffset = new Vector2(0, 1);
 
             GameObject bgRoot = new GameObject("AmPhuBackdrop_Room");
+            bgRoot.AddComponent<BackdropResources>().Initialize(tex, bgMat, centerMat, rightMat, leftMat, ceilingMat);
 
             GameObject centerQuad = GameObject.CreatePrimitive(PrimitiveType.Quad);
             centerQuad.name = "AmPhuBackdrop_Center";

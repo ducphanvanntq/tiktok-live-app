@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using UnityEngine;
 
@@ -14,19 +13,7 @@ namespace TikTokLiveGame
         private readonly Dictionary<string, Donor> donors = new();
         private readonly List<FeedEntry> feed = new();
 
-        // ── Toast chào người mới vào sàn ────────────────────────────────
-        // Mỗi người chỉ được chào một lần mỗi phiên, nên cần nhớ ai đã chào.
-        private readonly HashSet<string> greeted = new();
-        private readonly Queue<string> welcomeQueue = new();
-        private string welcomeName = string.Empty;
-        private float welcomeUntil;
-        private const float WelcomeSeconds = 2.5f;
-        private const float WelcomeFadeSeconds = 0.5f;
-        // Chặn dồn toast khi có cả chục người vào một lúc: giữ tối đa 6 lượt,
-        // quá thì bỏ người đến sau thay vì kéo dài hàng đợi vô hạn.
-        private const int WelcomeQueueLimit = 6;
-        // Live dài có thể qua hàng nghìn người xem; xả bộ nhớ khi tập quá lớn.
-        private const int GreetedLimit = 4000;
+        private WelcomeToast welcomeToast;
         private string username = "";
         private string connectionStatus = "Đang chờ Node server...";
         private int events;
@@ -48,27 +35,6 @@ namespace TikTokLiveGame
         private GUIStyle inputStyle;
         private GUIStyle rankStyle;
         private GUIStyle bannerStyle;
-        private GUIStyle welcomeNameFill;
-        private GUIStyle welcomeNameOutline;
-        private GUIStyle welcomeSubFill;
-        private GUIStyle welcomeSubOutline;
-        // Chữ nổi trơn không có nền, nên viền phải vẽ đủ 8 hướng mới đọc được
-        // trên mọi màu cảnh phía sau.
-        private static readonly Vector2[] OutlineOffsets =
-        {
-            new(-1f, -1f), new(1f, -1f), new(-1f, 1f), new(1f, 1f),
-            new(-1f, 0f), new(1f, 0f), new(0f, -1f), new(0f, 1f)
-        };
-        // Toast không đứng một chỗ: mỗi lượt chọn một điểm neo khác, tránh trùng
-        // ngay với lượt trước. Toạ độ chuẩn hoá 0..1 theo khung GUI đã scale.
-        private static readonly Vector2[] WelcomeAnchors =
-        {
-            new(0.50f, 0.185f), new(0.28f, 0.245f), new(0.72f, 0.245f),
-            new(0.26f, 0.370f), new(0.74f, 0.370f), new(0.50f, 0.450f),
-            new(0.30f, 0.650f), new(0.70f, 0.650f), new(0.50f, 0.720f)
-        };
-        private Vector2 welcomeAnchor = WelcomeAnchors[0];
-        private int welcomeAnchorIndex = -1;
         private Texture2D energyBack;
         private Texture2D energyFill;
         // DrawControls() dùng texture này cho tab đang chọn, nên phải là field
@@ -80,11 +46,12 @@ namespace TikTokLiveGame
 
         public void Initialize(TikTokWebSocketClient socketClient, PlayerManager manager, GiftEffectManager effects)
         {
+            welcomeToast = gameObject.AddComponent<WelcomeToast>();
             client = socketClient;
             playerManager = manager;
             giftEffects = effects;
             clubCamera = Camera.main?.GetComponent<ClubCameraController>();
-            client.EventReceived += HandleEvent;
+            if (client != null) client.EventReceived += HandleEvent;
             username = PlayerPrefs.GetString("TikTokUsername", string.Empty);
         }
 
@@ -96,14 +63,6 @@ namespace TikTokLiveGame
             if (Input.GetKeyDown(KeyCode.F11)) Screen.fullScreen = !Screen.fullScreen;
             for (int index = feed.Count - 1; index >= 0; index--)
                 if (Time.unscaledTime - feed[index].Time > 9f) feed.RemoveAt(index);
-
-            // Toast chào hiện lần lượt: chỉ lấy người kế tiếp khi người trước đã hết giờ.
-            if (Time.unscaledTime >= welcomeUntil && welcomeQueue.Count > 0)
-            {
-                welcomeName = welcomeQueue.Dequeue();
-                welcomeUntil = Time.unscaledTime + WelcomeSeconds;
-                welcomeAnchor = NextWelcomeAnchor();
-            }
         }
 
         private void HandleEvent(TikTokEvent liveEvent)
@@ -120,10 +79,6 @@ namespace TikTokLiveGame
                     donors[donor.userId] = new Donor(donor.userId, donor.nickname, donor.score);
                     diamonds += donor.score;
                 }
-                // Snapshot là phiên đang có sẵn (lúc nối lại Node). Đánh dấu đã chào
-                // hết để không bắn một loạt toast cho người vào từ trước.
-                foreach (TikTokPlayerData player in liveEvent.players ?? System.Array.Empty<TikTokPlayerData>())
-                    if (!string.IsNullOrWhiteSpace(player.userId)) greeted.Add(player.userId);
             }
             else if (liveEvent.type == "gift")
             {
@@ -158,14 +113,10 @@ namespace TikTokLiveGame
                 partyEnergy = 0f;
                 donors.Clear();
                 feed.Clear();
-                greeted.Clear();
-                welcomeQueue.Clear();
-                welcomeName = string.Empty;
-                welcomeUntil = 0f;
             }
 
             playerManager.Handle(liveEvent);
-            TryWelcome(liveEvent);
+            welcomeToast.Handle(liveEvent, playerManager);
             if (liveEvent.type is "gift" or "snapshot") UpdateTopPlayers();
             if (liveEvent.type == "gift")
             {
@@ -231,129 +182,6 @@ namespace TikTokLiveGame
             giftEffects.PartyBurst();
         }
 
-        /// <summary>
-        /// Xếp một lượt chào cho người vừa xuất hiện trên sàn lần đầu.
-        /// Không dùng cờ joinedNow của bridge vì cờ đó chỉ bật cho lượt vào bằng
-        /// từ khoá/follow/share — người vào bằng gift, hoặc mọi người khi joinMode
-        /// là all_interactions, sẽ không được tính. Điều kiện ở đây là "đã có mặt
-        /// trên sàn và chưa từng được chào", nên đúng với cả hai joinMode.
-        /// </summary>
-        private void TryWelcome(TikTokEvent liveEvent)
-        {
-            if (playerManager == null || string.IsNullOrWhiteSpace(liveEvent.userId)) return;
-            if (liveEvent.type is not ("member" or "chat" or "gift" or "like" or "follow" or "share")) return;
-            // NPC lấp sàn không phải người xem thật.
-            if (liveEvent.userId.StartsWith("npc-")) return;
-            // Find() trả null nếu người này bị chặn vì spectatorOnly, tức chưa lên sàn.
-            if (playerManager.Find(liveEvent.userId) == null) return;
-            if (greeted.Count > GreetedLimit) greeted.Clear();
-            if (!greeted.Add(liveEvent.userId)) return;
-
-            if (welcomeQueue.Count >= WelcomeQueueLimit) return;
-            string name = string.IsNullOrWhiteSpace(liveEvent.nickname)
-                ? (string.IsNullOrWhiteSpace(liveEvent.uniqueId) ? "Khách mới" : liveEvent.uniqueId)
-                : liveEvent.nickname;
-            int[] elements = StringInfo.ParseCombiningCharacters(name);
-            if (elements.Length > 22) name = name[..elements[22]].TrimEnd() + "…";
-            welcomeQueue.Enqueue(name);
-        }
-
-        /// <summary>Chọn điểm neo khác lượt trước để toast không luôn hiện một chỗ.</summary>
-        private Vector2 NextWelcomeAnchor()
-        {
-            if (WelcomeAnchors.Length < 2) return WelcomeAnchors[0];
-            int index = welcomeAnchorIndex;
-            while (index == welcomeAnchorIndex) index = Random.Range(0, WelcomeAnchors.Length);
-            welcomeAnchorIndex = index;
-            return WelcomeAnchors[index];
-        }
-
-        /// <summary>
-        /// Vẽ chữ cách điệu: từng ký tự một, giãn cách, nhấp nhô dạng sóng, và mỗi
-        /// ký tự có viền tối vẽ lệch 8 hướng. Một GUI.Label không làm được vì cần
-        /// dịch riêng từng ký tự và cần hai lớp màu khác nhau.
-        /// </summary>
-        private static void DrawWaveText(float x, float y, string text, GUIStyle fill, GUIStyle outline,
-                                         float spacing, float amplitude, float phase, float outlineSize)
-        {
-            float cursor = x;
-            int index = 0;
-            TextElementEnumerator elements = StringInfo.GetTextElementEnumerator(text);
-            while (elements.MoveNext())
-            {
-                string glyph = elements.GetTextElement();
-                float glyphWidth = fill.CalcSize(new GUIContent(glyph)).x;
-                // Lệch pha theo vị trí ký tự để sóng chạy dọc chuỗi.
-                float bob = Mathf.Sin(Time.unscaledTime * 4.2f + index * 0.62f + phase) * amplitude;
-                Rect slot = new(cursor, y + bob, glyphWidth + 4f, fill.fontSize + 12f);
-                if (glyph != " ")
-                {
-                    foreach (Vector2 offset in OutlineOffsets)
-                        GUI.Label(new Rect(slot.x + offset.x * outlineSize, slot.y + offset.y * outlineSize,
-                            slot.width, slot.height), glyph, outline);
-                    GUI.Label(slot, glyph, fill);
-                }
-                cursor += glyphWidth + spacing;
-                index++;
-            }
-        }
-
-        /// <summary>Đo bề rộng chuỗi đúng như DrawWaveText sẽ vẽ, không vẽ gì.</summary>
-        private static float MeasureWaveText(string text, GUIStyle style, float spacing)
-        {
-            float total = 0f;
-            TextElementEnumerator elements = StringInfo.GetTextElementEnumerator(text);
-            while (elements.MoveNext())
-                total += style.CalcSize(new GUIContent(elements.GetTextElement())).x + spacing;
-            return Mathf.Max(0f, total - spacing);
-        }
-
-        private void DrawWelcome(float width, float height)
-        {
-            if (string.IsNullOrEmpty(welcomeName) || Time.unscaledTime >= welcomeUntil) return;
-
-            const string subtitle = "VỪA VÀO SÀN";
-            const float blockHeight = 62f;
-            const float nameSpacing = 2.5f;
-            const float subSpacing = 5f;
-
-            float nameWidth = MeasureWaveText(welcomeName, welcomeNameFill, nameSpacing);
-            float subWidth = MeasureWaveText(subtitle, welcomeSubFill, subSpacing);
-            float blockWidth = Mathf.Max(nameWidth, subWidth);
-
-            float remaining = welcomeUntil - Time.unscaledTime;
-            float elapsed = WelcomeSeconds - remaining;
-            float intro = Mathf.Clamp01(elapsed / 0.28f);
-            float outro = Mathf.Clamp01(remaining / WelcomeFadeSeconds);
-            float ease = 1f - Mathf.Pow(1f - intro, 3f);          // ease-out cubic
-            float alpha = Mathf.Min(ease, outro);
-
-            // Neo ngẫu nhiên, nhưng kẹp lại để chữ luôn nằm trọn trong khung và
-            // không đè lên header phía trên hay vùng feed phía dưới.
-            float centerX = Mathf.Clamp(width * welcomeAnchor.x,
-                blockWidth * 0.5f + 24f, Mathf.Max(blockWidth * 0.5f + 24f, width - blockWidth * 0.5f - 24f));
-            float y = Mathf.Clamp(height * welcomeAnchor.y, 88f, Mathf.Max(88f, height - blockHeight - 210f));
-            // Trượt xuống khi vào, nhấc lên nhẹ khi tan.
-            y += -24f * (1f - ease) - 12f * (1f - outro);
-
-            Matrix4x4 savedMatrix = GUI.matrix;
-            Color savedColor = GUI.color;
-            // Pop nhẹ từ 90% lên 100% cho cảm giác nảy vào.
-            GUIUtility.ScaleAroundPivot(
-                Vector2.one * (0.90f + 0.10f * ease),
-                new Vector2(centerX, y + blockHeight * 0.5f));
-
-            GUI.color = new Color(1f, 1f, 1f, alpha);
-            // Hai dòng căn giữa độc lập nên tên dài hay ngắn vẫn cân so với nhau.
-            DrawWaveText(centerX - nameWidth * 0.5f, y, welcomeName,
-                welcomeNameFill, welcomeNameOutline, nameSpacing, 3f, 0f, 2f);
-            DrawWaveText(centerX - subWidth * 0.5f, y + 42f, subtitle,
-                welcomeSubFill, welcomeSubOutline, subSpacing, 1.5f, 1.9f, 1.5f);
-
-            GUI.color = savedColor;
-            GUI.matrix = savedMatrix;
-        }
-
         private void AddFeed(string text, Color color)
         {
             feed.Add(new FeedEntry(text, color, Time.unscaledTime));
@@ -381,7 +209,7 @@ namespace TikTokLiveGame
             if (giftEffects != null && Time.unscaledTime < giftEffects.BannerUntil)
                 GUI.Box(new Rect(width * 0.5f - 310f, 142f, 620f, 68f), giftEffects.BannerText, bannerStyle);
 
-            DrawWelcome(width, height);
+            welcomeToast?.Draw(width, height, feed.Count);
 
             GUI.matrix = originalMatrix;
         }
@@ -420,20 +248,20 @@ namespace TikTokLiveGame
                 if (GUI.Button(new Rect(247, 196, 118, 38), "KẾT NỐI", buttonStyle))
                 {
                     PlayerPrefs.SetString("TikTokUsername", username);
-                    client.ConnectTikTok(username);
+                    client?.ConnectTikTok(username);
                     controlsVisible = false;
                     restoreControlsAfterCinematic = false;
                 }
-                if (GUI.Button(new Rect(34, 246, 100, 40), "DEMO 30", buttonStyle)) client.StartDemo(30);
-                if (GUI.Button(new Rect(142, 246, 100, 40), "DEMO 400", buttonStyle)) client.StartDemo(400);
-                if (GUI.Button(new Rect(250, 246, 115, 40), "GIFT 100", buttonStyle)) client.DemoGift(100);
+                if (GUI.Button(new Rect(34, 246, 100, 40), "DEMO 30", buttonStyle)) client?.StartDemo(30);
+                if (GUI.Button(new Rect(142, 246, 100, 40), "DEMO 400", buttonStyle)) client?.StartDemo(400);
+                if (GUI.Button(new Rect(250, 246, 115, 40), "GIFT 100", buttonStyle)) client?.DemoGift(100);
                 
-                if (GUI.Button(new Rect(34, 296, 100, 36), "RESET", buttonStyle)) client.ResetGame();
+                if (GUI.Button(new Rect(34, 296, 100, 36), "RESET", buttonStyle)) client?.ResetGame();
                 if (GUI.Button(new Rect(142, 296, 100, 36), "ẨN (F1)", buttonStyle)) controlsVisible = false;
-                if (GUI.Button(new Rect(250, 296, 115, 36), "GIFT 1000", buttonStyle)) client.DemoGift(1000);
+                if (GUI.Button(new Rect(250, 296, 115, 36), "GIFT 1000", buttonStyle)) client?.DemoGift(1000);
                 
-                if (GUI.Button(new Rect(34, 344, 100, 36), "NGẮT LIVE", buttonStyle)) client.DisconnectTikTok();
-                if (GUI.Button(new Rect(142, 344, 100, 36), "DỪNG DEMO", buttonStyle)) client.StopDemo();
+                if (GUI.Button(new Rect(34, 344, 100, 36), "NGẮT LIVE", buttonStyle)) client?.DisconnectTikTok();
+                if (GUI.Button(new Rect(142, 344, 100, 36), "DỪNG DEMO", buttonStyle)) client?.StopDemo();
                 if (GUI.Button(new Rect(250, 344, 115, 36), chromaMode ? "HIỆN SÂN" : "CHROMA", buttonStyle)) ToggleChroma();
             }
             else
@@ -525,15 +353,6 @@ namespace TikTokLiveGame
             buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 15, fontStyle = FontStyle.Bold, normal = { background = button, textColor = Color.white }, hover = { background = buttonHover, textColor = Color.white }, active = { background = buttonHover, textColor = Color.white } };
             inputStyle = new GUIStyle(GUI.skin.textField) { fontSize = 18, normal = { background = input, textColor = Color.white }, padding = new RectOffset(12, 8, 8, 6) };
             bannerStyle = new GUIStyle(panelStyle) { fontSize = 24, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { background = Solid(new Color(0.28f, 0.025f, 0.24f, 0.95f)), textColor = Color.white } };
-            // ── Chữ chào người mới ──────────────────────────────────────
-            // Không có nền nên chữ vẽ hai lớp: lớp viền tối lệch 8 hướng, rồi
-            // lớp màu đè lên. GUI.color chỉ điều khiển alpha nên phải tách
-            // style riêng cho từng màu.
-            Color outlineColor = new(0.01f, 0.01f, 0.04f, 1f);
-            welcomeNameFill = new GUIStyle(GUI.skin.label) { fontSize = 32, fontStyle = FontStyle.Bold, alignment = TextAnchor.UpperLeft, normal = { textColor = Color.white } };
-            welcomeNameOutline = new GUIStyle(welcomeNameFill) { normal = { textColor = outlineColor } };
-            welcomeSubFill = new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.UpperLeft, normal = { textColor = new Color(0.35f, 0.98f, 1f, 1f) } };
-            welcomeSubOutline = new GUIStyle(welcomeSubFill) { normal = { textColor = outlineColor } };
         }
 
         private static Texture2D Solid(Color color)
