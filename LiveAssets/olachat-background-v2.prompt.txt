@@ -1,0 +1,9 @@
+Tool: built-in image_gen
+Edit target: olachat-background-v1.png
+Output: olachat-background-v2.png
+
+Final prompt:
+Edit the provided portrait green nightclub game background. Preserve its 9:16 composition, green architecture, chat-bubble panels, plants, stage, lighting and open reflective floor. Change ONLY signage arrangement and wordmark color as requested:
+Remove "OLACHAT.NET" from the current large central rounded sign. That central sign must now contain only the two centered large white/ivory lines "MẠNG XÃ HỘI" and "VIỆT NAM", with correct Vietnamese diacritics, beautifully balanced inside the sign.
+Relocate "OLACHAT.NET" to its OWN separate independent horizontal sign suspended above the main sign, in the upper central ceiling area, approximately 7-12% down from the image top, with visible architectural space separating the two signs. Make this website wordmark vivid hot pink neon #FF4081, bold clearly readable sans serif with a bright pink core and controlled pink halo, on a dark backing. Strong color contrast with the green scene. Do not duplicate the domain elsewhere. Keep all lettering within safe image margins and avoid excessive glow obscuring letters.
+Keep the underlying scene and large empty foreground dance floor unchanged. No new text, no people, no watermark. A polished finished background ready for the same game.

@@ -1,0 +1,12 @@
+Tool: built-in image_gen (imagegen skill)
+Asset: olachat-background-v1.png
+Brand palette source: https://olachat.net/assets/index-DJJvySYd.css
+Primary #7CB342; dark #558B2F; darker #33691E; light #F1F8E9; accent #FF4081.
+
+Final generation prompt:
+Create a finished high quality raster background image for a Vietnamese TikTok LIVE interactive dance floor game, portrait 9:16 aspect ratio, ideally 1440x2560. A welcoming modern futuristic social community music club for olachat.net. Color identity verified from website CSS: primary leaf green #7CB342, deep greens #558B2F and #33691E, pale green #F1F8E9, white, small hot pink #FF4081 accent lights. Mostly deep forest green architecture with bright leaf green edge lighting and softly glowing ivory signage, polished dark green reflective dance floor. Elegant dimensional architectural render, symmetrical front-facing camera, central vanishing point, immersive large interior with curved illuminated arch and tasteful recessed LED panels, delicate chat bubble motifs integrated into two side panels to evoke online conversation. Premium crisp realistic 3D environment lighting, refined clean geometry, restrained bloom, inviting energetic atmosphere.
+Text must be spelled EXACTLY, correct Vietnamese diacritics, clean bold sans serif integrated into a large readable upper central signage panel:
+Top wordmark: "OLACHAT.NET"
+Below, headline on two balanced lines: "MẠNG XÃ HỘI" then "VIỆT NAM".
+Signage is entirely within upper 12-32 percent of frame and central 70 percent width with ample edge margin. Headline prominently legible at phone size. No other text, no other brands, no watermark. Do not invent a logo mark.
+Composition is a GAME BACKGROUND, not a poster or website screenshot. Upper section houses architectural signage, middle section open depth and empty low stage, bottom 55 percent an empty expansive uninterrupted dance floor with subtle green floor-line reflections, intentionally low visual clutter so animated characters can be composited over it. No people, no dancers, no characters, no DJ equipment in foreground, no furniture blocking floor, no horror, no skulls. Full bleed finished image with no border.

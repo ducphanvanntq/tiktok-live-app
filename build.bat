@@ -15,10 +15,35 @@ if not defined PROJECT_VERSION (
     goto :failed
 )
 
-set "UNITY_EXE=C:\Program Files\Unity\Hub\Editor\%PROJECT_VERSION%\Editor\Unity.exe"
-if not exist "%UNITY_EXE%" (
-    echo [LOI] Chua cai dung Unity %PROJECT_VERSION%.
-    echo Hay cai phien ban nay bang Unity Hub roi chay lai build.bat.
+rem Unity Hub cho phep doi thu muc cai Editor sang o dia khac, nen khong the
+rem gia dinh no luon nam o C:\Program Files. Tim theo thu tu: bien moi truong
+rem UNITY_EDITOR (chi dinh thu cong) -> duong dan phu Hub da luu -> cac vi tri
+rem thong dung.
+set "UNITY_EXE="
+
+if defined UNITY_EDITOR if exist "%UNITY_EDITOR%" set "UNITY_EXE=%UNITY_EDITOR%"
+
+set "HUB_CFG=%APPDATA%\UnityHub\secondaryInstallPath.json"
+if not defined UNITY_EXE if exist "%HUB_CFG%" (
+    for /f usebackq^ tokens^=1^ delims^=^" %%p in ("%HUB_CFG%") do (
+        if exist "%%p\%PROJECT_VERSION%\Editor\Unity.exe" set "UNITY_EXE=%%p\%PROJECT_VERSION%\Editor\Unity.exe"
+    )
+)
+
+for %%r in (
+    "C:\Program Files\Unity\Hub\Editor"
+    "D:\Unity\Editors"
+    "D:\Unity\Hub\Editor"
+    "D:\Program Files\Unity\Hub\Editor"
+    "E:\Unity\Editors"
+    "E:\Unity\Hub\Editor"
+) do if not defined UNITY_EXE if exist "%%~r\%PROJECT_VERSION%\Editor\Unity.exe" set "UNITY_EXE=%%~r\%PROJECT_VERSION%\Editor\Unity.exe"
+
+if not defined UNITY_EXE (
+    echo [LOI] Khong tim thay Unity %PROJECT_VERSION% tren may.
+    echo Cai phien ban nay bang Unity Hub, hoac chi dinh truc tiep:
+    echo     set "UNITY_EDITOR=D:\duong\dan\Editor\Unity.exe"
+    echo     build.bat
     goto :failed
 )
 
@@ -26,6 +51,7 @@ echo =======================================
 echo     BUILD GAME ONG CHU MMO LIVE
 echo =======================================
 echo Unity: %PROJECT_VERSION%
+echo Editor: %UNITY_EXE%
 echo Output: %OUTPUT_EXE%
 echo.
 

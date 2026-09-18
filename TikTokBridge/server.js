@@ -15,6 +15,7 @@ const { getServerSettings, loadEnvironmentFile } = require('./src/config/environ
 loadEnvironmentFile();
 
 const { normalizeTikFinityMessage } = require('./src/tiktok/normalize-tikfinity-event');
+const { mergeObservedGift } = require('./src/tiktok/observed-gift');
 const {
     normalizeChat,
     normalizeMember,
@@ -54,6 +55,9 @@ const masterConfigPath = path.join(__dirname, 'config', 'master.json');
 const observedGiftsPath = path.join(__dirname, 'config', 'observed-gifts.json');
 const LIVE_PROVIDER = String(process.env.LIVE_PROVIDER || gameConfig.liveProvider || 'tikfinity').toLowerCase();
 const TIKFINITY_WS_URL = String(process.env.TIKFINITY_WS_URL || gameConfig.tikfinityWsUrl || 'ws://127.0.0.1:21213/');
+// Đặt LOG_TIKTOK_EVENTS=1 để in từng sự kiện nhận được từ TikTok. Mặc định tắt
+// vì một phiên live đông có thể sinh hàng trăm dòng mỗi phút.
+const LOG_TIKTOK_EVENTS = process.env.LOG_TIKTOK_EVENTS === '1';
 
 let liveConnection = null;
 let connectionAttempt = 0;
@@ -226,21 +230,12 @@ function scheduleObservedGiftSave() {
 
 function learnObservedGift(event) {
     const giftId = String(event.giftId || '').trim();
-    const giftName = String(event.giftName || 'Gift').trim();
-    const key = giftId || giftName.toLocaleLowerCase('vi');
+    const incomingName = String(event.giftName || 'Gift').trim();
+    const key = giftId || incomingName.toLocaleLowerCase('vi');
     if (!key) return;
     const previous = observedGifts.get(key) || {};
-    const repeats = Math.max(1, Number(event.repeatCount) || 1);
-    const unitDiamonds = Math.max(0,
-        Number(event.unitDiamondCount) || Math.round((Number(event.diamondCount) || 0) / repeats));
-    const learnedGift = {
-        ...previous,
-        giftId,
-        giftName,
-        diamondCount: unitDiamonds || Number(previous.diamondCount) || 0,
-        giftPictureUrl: nonEmpty(event.giftPictureUrl, previous.giftPictureUrl || ''),
-        lastSeenAt: Date.now()
-    };
+    const learnedGift = mergeObservedGift(previous, event);
+    const { giftName, diamondCount: unitDiamonds } = learnedGift;
     observedGifts.set(key, learnedGift);
     if (observedGifts.size > 500) {
         const oldest = [...observedGifts.entries()]
@@ -634,22 +629,76 @@ function connectToLiveProvider(username, options = {}) {
         : connectToTikTok(username, options);
 }
 
+function describeTikTokEvent(event) {
+    if (event.type === 'gift') {
+        return `gift "${event.giftName}" (id ${event.giftId || '?'}) x${event.repeatCount} = ${event.diamondCount} diamond`;
+    }
+    if (event.type === 'chat') return `chat: ${event.comment}`;
+    if (event.type === 'like') return `like x${event.likeCount}`;
+    return event.type;
+}
+
+function tikTokErrorHint(error) {
+    switch (error?.constructor?.name) {
+        case 'UserOfflineError':
+            return 'Tài khoản này hiện KHÔNG live. Chỉ kết nối được khi họ đang phát trực tiếp.';
+        case 'InvalidUniqueIdError':
+            return 'Username không hợp lệ. Lấy đúng phần sau @ trong link tiktok.com/@username.';
+        case 'SignatureRateLimitError':
+            return 'Hết hạn mức sign API miễn phí. Đặt EULER_API_KEY trong .env hoặc chờ rồi thử lại.';
+        case 'SignAPIError':
+        case 'SignatureMissingTokensError':
+            return 'Sign API (Euler Stream) từ chối yêu cầu. Kiểm tra lại EULER_API_KEY.';
+        case 'PremiumFeatureError':
+            return 'Tính năng này cần gói trả phí của Euler Stream.';
+        case 'ConnectTimeoutError':
+            return 'Hết thời gian chờ khi kết nối. Kiểm tra mạng, proxy hoặc VPN.';
+        default:
+            return '';
+    }
+}
+
 function attachTikTokEvents(connection) {
     const active = () => liveConnection === connection;
+    const forward = event => {
+        if (LOG_TIKTOK_EVENTS) {
+            const who = event.nickname || event.uniqueId || event.userId || '?';
+            console.log(`[tiktok] ${who} — ${describeTikTokEvent(event)}`);
+        }
+        processGameEvent(event);
+    };
     // EventEmitter treats an unhandled `error` event as fatal. Keep the bridge
     // alive and let connect/reconnect report the connection state instead.
+    // Thư viện phát ra object `{ info, exception }` chứ không phải Error, nên
+    // phải bóc `exception` ra mới có message và tên lớp lỗi để in.
     connection.on('error', error => {
-        console.warn('TikTok connection error:', error?.message || error);
+        const cause = error?.exception || error;
+        const label = cause?.constructor?.name || 'Error';
+        console.warn(`TikTok connection error: [${label}] ${cause?.message || cause}`);
+        if (error?.info && error.info !== cause?.message) console.warn(`[tiktok]   ngữ cảnh: ${error.info}`);
     });
-    connection.on('member', data => active() && processGameEvent(normalizeMember(data)));
-    connection.on('chat', data => active() && processGameEvent(normalizeChat(data)));
-    connection.on('like', data => active() && processGameEvent(normalizeLike(data)));
-    connection.on('follow', data => active() && processGameEvent(normalizeSocial('follow', data)));
-    connection.on('share', data => active() && processGameEvent(normalizeSocial('share', data)));
+    connection.on('websocketConnected', () => console.log('[tiktok] WebSocket Webcast đã mở'));
+    connection.on('enterRoom', () => console.log('[tiktok] Đã vào phòng live, bắt đầu nhận sự kiện'));
+    // `decodedData` thấy được cả loại message mà bridge không xử lý, nên rất hữu
+    // ích khi live đang chạy nhưng sàn nhảy không thấy sự kiện nào.
+    if (LOG_TIKTOK_EVENTS) {
+        connection.on('decodedData', name => console.log(`[tiktok] raw: ${name}`));
+    }
+    connection.on('member', data => active() && forward(normalizeMember(data)));
+    connection.on('chat', data => active() && forward(normalizeChat(data)));
+    connection.on('like', data => active() && forward(normalizeLike(data)));
+    connection.on('follow', data => active() && forward(normalizeSocial('follow', data)));
+    connection.on('share', data => active() && forward(normalizeSocial('share', data)));
     connection.on('gift', data => {
         if (!active()) return;
         const event = normalizeGift(data);
-        if (!isPendingGiftStreak(event)) processGameEvent(event);
+        if (isPendingGiftStreak(event)) {
+            if (LOG_TIKTOK_EVENTS) {
+                console.log(`[tiktok] chờ kết thúc streak: ${event.giftName} x${event.repeatCount}`);
+            }
+            return;
+        }
+        forward(event);
     });
 }
 
@@ -673,6 +722,9 @@ async function connectToTikTok(username, options = {}) {
         isReconnect ? `Đang kết nối lại @${username}...` : `Đang kết nối @${username}...`
     );
     let connection;
+    console.log(`[tiktok] Kết nối trực tiếp @${username} — sign key: ${
+        process.env.EULER_API_KEY ? 'có (EULER_API_KEY)' : 'không, dùng hạn mức miễn phí'
+    }${LOG_TIKTOK_EVENTS ? '' : ' — đặt LOG_TIKTOK_EVENTS=1 để xem từng sự kiện'}`);
     try {
         connection = new TikTokLiveConnection(username, {
             signApiKey: process.env.EULER_API_KEY || undefined,
@@ -690,6 +742,7 @@ async function connectToTikTok(username, options = {}) {
 
     connection.on('streamEnd', () => {
         if (liveConnection !== connection) return;
+        console.log(`[tiktok] @${username} đã tắt live`);
         liveConnection = null;
         desiredUsername = null;
         cancelReconnect();
@@ -697,6 +750,7 @@ async function connectToTikTok(username, options = {}) {
     });
     connection.on('disconnected', () => {
         if (liveConnection !== connection) return;
+        console.log(`[tiktok] Mất kết nối @${username}`);
         liveConnection = null;
         scheduleReconnect(username);
     });
@@ -714,7 +768,9 @@ async function connectToTikTok(username, options = {}) {
     } catch (error) {
         if (attempt !== connectionAttempt) return;
         liveConnection = null;
-        console.error(`Không thể kết nối @${username}:`, error.message);
+        console.error(`Không thể kết nối @${username}: [${error?.constructor?.name || 'Error'}] ${error.message}`);
+        const hint = tikTokErrorHint(error);
+        if (hint) console.error(`[tiktok]   → ${hint}`);
         if (desiredUsername === username) scheduleReconnect(username);
     }
 }
