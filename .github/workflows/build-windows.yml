@@ -64,9 +64,14 @@ jobs:
           versioning: None
           allowDirtyBuild: true
 
-      # unity-builder runs Unity as root inside the container.
+      # unity-builder runs Unity as root inside the container, so the output and
+      # the Library cache come back owned by root. buildsPath is relative to the
+      # workspace, not to projectPath, so chown the whole tree rather than
+      # guessing where the player landed.
       - name: Restore ownership
-        run: sudo chown -R "$(id -u):$(id -g)" UnityProject/build UnityProject/Library
+        run: |
+          sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE"
+          find "$GITHUB_WORKSPACE" -name 'OngChuMMO_Live.exe' -printf 'player: %p\n'
 
       - name: Package release
         run: bash scripts/package-windows.sh "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/dist"
