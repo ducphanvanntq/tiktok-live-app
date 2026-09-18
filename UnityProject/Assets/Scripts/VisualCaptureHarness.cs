@@ -122,7 +122,10 @@ namespace TikTokLiveGame
             }
             int previousTheme = -1;
             int previousAnchor = -1;
+            int previousComposition = -1;
+            int previousPattern = -1;
             var seenThemes = new System.Collections.Generic.HashSet<int>();
+            var seenFlights = new System.Collections.Generic.HashSet<string>();
             var captureTimes = new System.Text.StringBuilder();
             for (int sample = 0; sample < names.Length; sample++)
             {
@@ -133,6 +136,10 @@ namespace TikTokLiveGame
                     "Adjacent welcomes must change theme and anchor.");
                 previousTheme = toast.ThemeIndex;
                 previousAnchor = toast.AnchorIndex;
+                Require(toast.FlightComposition != previousComposition && toast.FlightPattern != previousPattern,
+                    "Consecutive viewers must get a different flock distribution and dominant flight pattern.");
+                previousComposition = toast.FlightComposition;
+                previousPattern = toast.FlightPattern;
                 Require(seenThemes.Add(toast.ThemeIndex), "All twelve palettes must appear before the deck repeats.");
                 // Several frames per welcome show entrance, wing motion and exit.
                 float sampleStart = Time.unscaledTime;
@@ -156,6 +163,8 @@ namespace TikTokLiveGame
                     {
                         Require(toast.CardRect.width > 0f, "The UI must actually render, not just update while hidden.");
                         VerifyFlights(toast);
+                        Require(seenFlights.Add(FlightFingerprint(toast)),
+                            "Each viewer must have new trajectories, even after ignoring card position and butterfly ordering.");
                         if (sample != 2 && !string.IsNullOrEmpty(avatarUrl))
                             Require(toast.HasActiveAvatar, "The viewer avatar must load and appear on its card.");
                     }
@@ -172,13 +181,13 @@ namespace TikTokLiveGame
                     yield return new WaitForSecondsRealtime(0.025f);
                 }
                 Require(renderedFrames > 10, "The preview must render enough frames to run flight checks.");
-                Debug.Log($"WELCOME_SAMPLE {sample}: theme={toast.ThemeIndex}, name=#{ColorUtility.ToHtmlStringRGB(toast.NameColor)}, background=#{ColorUtility.ToHtmlStringRGB(toast.BackgroundColor)}, anchor={toast.AnchorIndex}, card={toast.CardRect}, flockDraws={maximumFlockDraws}");
+                Debug.Log($"WELCOME_SAMPLE {sample}: theme={toast.ThemeIndex}, name=#{ColorUtility.ToHtmlStringRGB(toast.NameColor)}, background=#{ColorUtility.ToHtmlStringRGB(toast.BackgroundColor)}, anchor={toast.AnchorIndex}, card={toast.CardRect}, flockDraws={maximumFlockDraws}, pattern={toast.FlightPattern}, {toast.FlightDistribution}");
                 yield return new WaitForSecondsRealtime(0.3f);
             }
             emit(new TikTokEvent { type = "reset" });
             Require(toast.PendingCount == 0 && toast.ActiveUserId == null, "Final reset must clear the effect.");
             System.IO.File.WriteAllText(System.IO.Path.Combine(directory, "verification.txt"),
-                "PASS: invalid arguments/manifests, texture ownership, card/avatar alpha pixels, spectator/NPC filtering, once-per-viewer, reconnect preserves active/queue, overflow retry, reset, 12 palettes, text contrast, seeded continuous flights, measured wing bounds, flights on card, growing-feed clearance, <=132 flock draw calls.\n");
+                "PASS: invalid arguments/manifests, texture ownership, card/avatar alpha pixels, spectator/NPC filtering, once-per-viewer, reconnect preserves active/queue, overflow retry, reset, 12 palettes, text contrast, 12 distinct trajectory sets, changing flock distributions/patterns, seeded continuous flights, measured wing bounds, flights on card, growing-feed clearance, <=132 flock draw calls.\n");
             System.IO.File.WriteAllText(System.IO.Path.Combine(directory, "frame-times.tsv"), captureTimes.ToString());
             Debug.Log("WELCOME_PREVIEW_OK");
             yield return new WaitForSecondsRealtime(1f);
@@ -203,7 +212,7 @@ namespace TikTokLiveGame
             for (int i = 0; i < toast.ButterflyCount; i++)
             {
                 Vector2 previous = toast.FlightPosition(i, 0f);
-                Vector2 previousVelocity = Vector2.zero;
+                int previousDirection = 0;
                 float travel = 0f;
                 for (float t = 0.025f; t <= WelcomeToast.Duration; t += 0.025f)
                 {
@@ -220,10 +229,16 @@ namespace TikTokLiveGame
                     // of adjacent control-point differences. Scale the bound by dt.
                     Require(velocity.magnitude <= toast.FlightSpeedLimit(i) * 0.025f + 0.02f,
                         "Flight speed must remain inside its control-point derivative bound.");
-                    if (Mathf.Abs(previousVelocity.x) > 0.05f && Mathf.Abs(velocity.x) > 0.05f && Mathf.Sign(previousVelocity.x) != Mathf.Sign(velocity.x)) turns++;
+                    // A smooth turn passes through nearly zero speed. Keep the
+                    // last moving direction through that pause instead of losing it.
+                    if (Mathf.Abs(velocity.x) > 0.05f)
+                    {
+                        int direction = velocity.x > 0f ? 1 : -1;
+                        if (previousDirection != 0 && direction != previousDirection) turns++;
+                        previousDirection = direction;
+                    }
                     travel += velocity.magnitude;
                     previous = position;
-                    previousVelocity = velocity;
                 }
                 Require(travel > 12f, "Every butterfly must move along its own path.");
                 for (int j = 0; j < i; j++)
@@ -235,6 +250,23 @@ namespace TikTokLiveGame
             }
             Require(turns >= 2, "The flock must include independent changes of direction.");
             Require(onCard > 0, "Some butterflies must visibly fly over the card background.");
+        }
+
+        private static string FlightFingerprint(WelcomeToast toast)
+        {
+            var trajectories = new System.Collections.Generic.List<string>();
+            for (int i = 0; i < toast.ButterflyCount; i++)
+            {
+                var points = new System.Text.StringBuilder();
+                foreach (float time in new[] { 0f, 0.7f, 1.4f, 2.1f })
+                {
+                    Vector2 offset = toast.FlightPosition(i, time) - toast.CardRect.center;
+                    points.Append(Mathf.RoundToInt(offset.x)).Append(',').Append(Mathf.RoundToInt(offset.y)).Append(';');
+                }
+                trajectories.Add(points.ToString());
+            }
+            trajectories.Sort(StringComparer.Ordinal);
+            return string.Join("|", trajectories);
         }
 
         private static void VerifyArgumentsAndAssets()

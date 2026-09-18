@@ -13,7 +13,8 @@ atlas and manifest are bundled under `Assets/Resources/Welcome/`.
 
 ## Runtime behavior
 
-- Draw 12 small butterflies per welcome. Each has a newly generated B-spline flight with independent turns, depth, speed, wingbeat and size; they do not follow a shared orbit.
+- Draw 12 small butterflies per welcome. Randomize how many occupy each edge, their starting positions and which butterflies are larger; consecutive viewers never reuse the same distribution. Each has a newly generated B-spline flight with independent turns, depth, speed and wingbeat.
+- Randomize the dominant movement between wandering flutter, small loops and wider swoops, with individual variations within each flock. Production uses an unseeded random stream; the capture harness seeds that stream once for reproducibility, never once per viewer.
 - Trails have a tapered colored glow, a brighter fine core and drifting four-point sparkles. Particles stay at their emission position and fade over 0.8 s.
 - Butterflies fly close to and over the card edges/background. Paint the card first, the flock second, then avatar/name/subtitle for legibility. Wing bounds use the measured atlas pivots and furthest frame corners.
 - Choose a new position in the lower screen area for each welcome. Keep it still unless the viewport changes or a growing chat feed requires moving it up.
@@ -50,7 +51,7 @@ Each new name gets one welcome; use another name to see a different theme and po
 
 For an isolated capture and runtime check, launch a new build with
 `-welcomePreviewPath <output-directory>`. This mode bypasses the live bridge, exercises
-snapshot/reset/queue/filtering rules, overflow retry, growing-feed clearance, texture ownership, malformed manifests/flags, rendered alpha pixels, flight continuity/bounds and text contrast. It captures all 12 palettes with a fixed random seed and exits. It needs a rendering
+snapshot/reset/queue/filtering rules, overflow retry, growing-feed clearance, texture ownership, malformed manifests/flags, rendered alpha pixels, flight continuity/bounds and text contrast. It also compares 12 viewers' trajectories after removing card position and butterfly ordering, and checks that consecutive distributions/patterns change. It captures all 12 palettes with a fixed random seed and exits. It needs a rendering
 desktop; a fully hidden or batch-mode player can suppress OnGUI and produce black frames.
 Optional `-welcomeAvatarUrl <http-url>` checks avatar loading as well, waiting for download completion before capture instead of using an animation frame as the deadline. An invalid or missing preview directory is an explicit launch error. The bootstrap omits the live transport only when the same parsed directory is passed to the harness.
 

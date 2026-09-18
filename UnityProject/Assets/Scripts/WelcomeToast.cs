@@ -21,6 +21,9 @@ namespace TikTokLiveGame
         private readonly HashSet<string> greeted = new();
         private readonly Queue<string> greetedOrder = new();
         private readonly Butterfly[] butterflies = new Butterfly[FlockSize];
+        private readonly int[] flightSides = new int[FlockSize];
+        private readonly int[] sideCounts = new int[4];
+        private readonly int[] sideSlots = new int[4];
         private System.Random random = new();
         private readonly Queue<int> themeDeck = new();
         private static readonly Vector2[] Anchors =
@@ -32,6 +35,8 @@ namespace TikTokLiveGame
         private float startedAt;
         private int themeIndex = -1;
         private int anchorIndex = -1;
+        private int flightPattern = -1;
+        private int flightComposition = -1;
         private Texture2D atlas;
         private Texture2D glow;
         private Texture2D sparkle;
@@ -59,6 +64,9 @@ namespace TikTokLiveGame
         internal Color NameColor => themes[themeIndex].Text;
         internal Color BackgroundColor => themes[themeIndex].Background;
         internal int ButterflyCount => butterflies.Length;
+        internal int FlightPattern => flightPattern;
+        internal int FlightComposition => flightComposition;
+        internal string FlightDistribution => $"top={sideCounts[0]},right={sideCounts[1]},bottom={sideCounts[2]},left={sideCounts[3]}";
         internal Vector2 FlightPosition(int index, float time) => Flight(layout, butterflies[index], time);
         internal float ButterflyRadius(int index) => butterflies[index].Size * frameRadius;
         internal void SetPreviewSeed(int seed) => random = new System.Random(seed);
@@ -262,7 +270,7 @@ namespace TikTokLiveGame
             anchorIndex = NextIndex(anchorIndex, Anchors.Length);
             viewport = Vector2.zero;
             Theme theme = themes[themeIndex];
-            for (int i = 0; i < butterflies.Length; i++) PlanFlight(butterflies[i], i, theme);
+            PlanFlock(theme);
         }
 
         private int NextTheme()
@@ -282,30 +290,90 @@ namespace TikTokLiveGame
             return themeDeck.Dequeue();
         }
 
-        private void PlanFlight(Butterfly butterfly, int index, Theme theme)
+        private void PlanFlock(Theme theme)
         {
-            // Four above, four below, two on each side. Each gets its own curved
-            // wandering path, depth and pace; there is no shared orbit or direction.
-            butterfly.Side = index < 4 ? 0 : index < 8 ? 2 : index < 10 ? 1 : 3;
+            // Vary the whole silhouette between viewers, not only small wiggles
+            // around twelve fixed positions. Keep all edges represented.
+            sideCounts[1] = random.Next(1, 4);
+            sideCounts[3] = random.Next(1, 4);
+            int horizontalCount = FlockSize - sideCounts[1] - sideCounts[3];
+            int minimumTop = Mathf.Max(2, horizontalCount - 6);
+            int maximumTop = Mathf.Min(6, horizontalCount - 2);
+            sideCounts[0] = random.Next(minimumTop, maximumTop + 1);
+            sideCounts[2] = horizontalCount - sideCounts[0];
+            int composition = PackComposition();
+            if (composition == flightComposition)
+            {
+                sideCounts[0] = minimumTop + (sideCounts[0] - minimumTop + 1) % (maximumTop - minimumTop + 1);
+                sideCounts[2] = horizontalCount - sideCounts[0];
+                composition = PackComposition();
+            }
+            flightComposition = composition;
+            flightPattern = NextIndex(flightPattern, 3);
+            int cursor = 0;
+            for (int side = 0; side < sideCounts.Length; side++)
+            {
+                sideSlots[side] = 0;
+                for (int i = 0; i < sideCounts[side]; i++) flightSides[cursor++] = side;
+            }
+            for (int i = flightSides.Length - 1; i > 0; i--)
+            {
+                int j = random.Next(i + 1);
+                (flightSides[i], flightSides[j]) = (flightSides[j], flightSides[i]);
+            }
+            for (int i = 0; i < butterflies.Length; i++)
+            {
+                int side = flightSides[i];
+                float home = -0.9f + (sideSlots[side]++ + Range(0.2f, 0.8f)) * 1.8f / sideCounts[side];
+                PlanFlight(butterflies[i], side, home, theme);
+            }
+        }
+
+        private int PackComposition() => sideCounts[0] | sideCounts[1] << 4 | sideCounts[2] << 8 | sideCounts[3] << 12;
+
+        private void PlanFlight(Butterfly butterfly, int side, float home, Theme theme)
+        {
+            butterfly.Side = side;
             bool horizontal = butterfly.Side % 2 == 0;
-            float home = horizontal ? -0.84f + (index % 4) * 0.56f : (index % 2 == 0 ? -0.5f : 0.5f);
-            float reach = horizontal ? Range(0.25f, 0.45f) : Range(0.55f, 0.9f);
+            float reach = Mathf.Min(horizontal ? Range(0.28f, 0.62f) : Range(0.45f, 0.85f), 1.06f - Mathf.Abs(home));
             float phase = Range(0f, Mathf.PI * 2f);
             float bend = Range(1.05f, 2.15f) * (random.Next(2) == 0 ? -1f : 1f);
-            butterfly.StepSeconds = Range(0.49f, 0.78f);
-            butterfly.Offset = Range(0f, 0.5f);
-            butterfly.Size = index % 4 == 0 ? Range(33f, 37f) : Range(23f, 31f);
+            int pattern = random.Next(4) == 0 ? random.Next(3) : flightPattern;
+            float depthCenter = Range(-7f, 3f);
+            float depthReach = Range(8f, 15f);
+            butterfly.StepSeconds = Range(0.49f, 0.85f);
+            butterfly.Offset = Range(0f, 0.95f);
+            butterfly.Size = random.Next(4) == 0 ? Range(33f, 37f) : Range(23f, 31f);
             butterfly.Flap = Range(0f, 4f);
             butterfly.FlapRate = Range(9f, 16f);
             butterfly.Wobble = phase;
             butterfly.Color = theme.Butterflies[random.Next(theme.Butterflies.Length)];
             for (int point = 0; point < butterfly.Path.Length; point++)
             {
-                float along = home + Mathf.Sin(phase + point * bend) * reach + Range(-0.09f, 0.09f);
+                float angle = phase + point * bend;
+                float along;
+                float depth;
+                if (pattern == 1) // Small loops, with independently chosen direction.
+                {
+                    along = home + Mathf.Cos(angle) * reach;
+                    depth = depthCenter + Mathf.Sin(angle) * depthReach;
+                }
+                else if (pattern == 2) // Wider swoops and changing height.
+                {
+                    along = home + Mathf.Sin(angle * 0.7f) * reach;
+                    depth = depthCenter + Mathf.Cos(angle * 1.4f) * depthReach;
+                }
+                else // Wandering flutter.
+                {
+                    along = home + Mathf.Sin(angle) * reach + Range(-0.09f, 0.09f);
+                    depth = depthCenter + Range(-depthReach, depthReach);
+                }
                 // Negative depth brings bodies over the card edge. The avatar
                 // and text are painted afterwards, so the content stays legible.
-                float depth = index % 3 == 0 ? Range(-13f, -4f) : Range(-10f, 18f);
-                butterfly.Path[point] = new Vector2(Mathf.Clamp(along, -1.06f, 1.06f), depth);
+                // The larger butterflies can now occupy any slot; cap vertical
+                // travel so a large wing at a lower corner still clears the feed.
+                float alongLimit = horizontal ? 1.06f : 1f;
+                butterfly.Path[point] = new Vector2(Mathf.Clamp(along, -alongLimit, alongLimit), Mathf.Clamp(depth, -14f, 18f));
             }
         }
 

@@ -115,7 +115,7 @@
       9,
       16
     ],
-    "flight": "Independent bounded B-splines close to and over card edges, with individual turns, pace and depth; regenerated per welcome.",
+    "flight": "Per-viewer random edge distribution, start positions and flutter/loop/swoop patterns. Independent bounded B-splines close to and over card edges; consecutive distributions and dominant patterns do not repeat.",
     "trail": "0.8 second tapered glow ribbon and drifting four-point sparkles.",
     "layering": "Card background, then butterflies flying over the edges, then avatar/name/subtitle to preserve readability.",
     "maximumFlockTextureDraws": 132
