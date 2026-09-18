@@ -174,6 +174,14 @@ namespace TikTokLiveGame
             value = diamonds,
             userIndex = userIndex
         });
+        public void DemoManualEvent(string action, string nickname, int diamonds, string giftName) => Send(new ClientMessage
+        {
+            type = "demo_event",
+            action = action,
+            manualUsername = nickname,
+            value = diamonds,
+            giftName = giftName
+        });
         private async void OnDisable()
         {
             lifetime?.Cancel();

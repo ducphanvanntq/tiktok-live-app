@@ -33,6 +33,19 @@ namespace TikTokLiveGame
         public long titleExpiresAt;
         public TikTokPlayerData[] players;
         public TikTokPlayerData[] vipScores;
+        public int pointsVersion;
+        public long pointsRevision;
+        public PointScoreData[] pointScores;
+    }
+
+    [Serializable]
+    public class PointScoreData
+    {
+        public string userId;
+        public string nickname;
+        public string avatar;
+        public long points;
+        public long reachedOrder;
     }
 
     [Serializable]
@@ -55,6 +68,7 @@ namespace TikTokLiveGame
         public string type;
         public string role;
         public string username;
+        public string manualUsername;
         public string action;
         public string giftName;
         public int count;

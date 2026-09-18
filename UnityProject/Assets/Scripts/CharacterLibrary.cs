@@ -9,7 +9,7 @@ namespace TikTokLiveGame
     {
         private static readonly string[] Names =
         {
-            "a", "b", "c", "d", "e", "g", "h", "j", "k",
+            "a", "b", "c", "e", "g", "h", "j", "k",
             "mushroom_dance_01", "mushroom_dance_15", "mushroom_magic_02",
             "hanhan_video_dance"
         };

@@ -36,6 +36,12 @@ namespace TikTokLiveGame
         {
             if (welcomeDirectory != null)
             {
+                if (Array.IndexOf(Environment.GetCommandLineArgs(), "-topPointsPreview") >= 0)
+                {
+                    TopPointsCaptureHarness pointsPreview = root.AddComponent<TopPointsCaptureHarness>();
+                    pointsPreview.StartCoroutine(pointsPreview.Capture(welcomeDirectory));
+                    return;
+                }
                 VisualCaptureHarness preview = root.AddComponent<VisualCaptureHarness>();
                 bool npcPreview = Array.IndexOf(Environment.GetCommandLineArgs(), "-npcPreview") >= 0;
                 preview.StartCoroutine(npcPreview ? preview.CaptureNpc(welcomeDirectory) : preview.CaptureWelcome(welcomeDirectory));

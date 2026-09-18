@@ -86,16 +86,30 @@ namespace TikTokLiveGame
         public void UpdateTopRanks(IEnumerable<string> rankedUserIds)
         {
             Dictionary<string, int> ranks = rankedUserIds
-                .Where(id =>
-                    !string.IsNullOrWhiteSpace(id) &&
-                    players.TryGetValue(id, out PlayerActor actor) &&
-                    !actor.IsNpc)
                 .Take(3)
                 .Select((id, index) => new { id, rank = index + 1 })
+                .Where(item =>
+                    !string.IsNullOrWhiteSpace(item.id) &&
+                    players.TryGetValue(item.id, out PlayerActor actor) &&
+                    !actor.IsNpc)
                 .ToDictionary(item => item.id, item => item.rank);
+            bool changed = false;
             foreach (KeyValuePair<string, PlayerActor> pair in players)
-                pair.Value.SetTopRank(ranks.TryGetValue(pair.Key, out int rank) ? rank : 0);
-            ApplyVisibilityState();
+            {
+                int rank = ranks.TryGetValue(pair.Key, out int value) ? value : 0;
+                if (pair.Value.TopRank == rank) continue;
+                pair.Value.SetTopRank(rank);
+                changed = true;
+            }
+            if (changed) ApplyVisibilityState();
+        }
+
+        internal bool OverlapsScreenRect(Camera camera, Rect rect)
+        {
+            if (camera == null) return true;
+            foreach (PlayerActor actor in players.Values)
+                if (actor != null && actor.OverlapsScreenRect(camera,rect)) return true;
+            return false;
         }
 
         public PlayerActor GetOrCreate(TikTokEvent data)

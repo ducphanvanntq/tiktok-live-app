@@ -21,7 +21,7 @@
 - 🕺 **Sàn nhảy 3D realtime** — Người xem TikTok tham gia sàn nhảy với nhân vật 3D
 - 👥 **20 NPC thường trực** — Chọn ngẫu nhiên từ 1.520 tên, không trùng trong cùng nhóm; vẫn ở lại khi người thật tham gia. Sàn hỗ trợ thêm tối đa 400 người thật.
 - 🎁 **Gift → Hiệu ứng** — Mỗi gift kích hoạt hiệu ứng riêng (zoom camera, pháo hoa, VIP spotlight...)
-- 🏆 **Bảng xếp hạng Top 3** — Top gifter đứng trên bục DJ
+- 🏆 **TOP 3 điểm** — 1 tim = 1 điểm, 1 kim cương quà = 100 điểm. Bảng nhỏ ở góc dưới phải, có animation đổi hạng; chưa có điểm thì để trống. Thứ hạng trên bục DJ theo cùng bảng điểm.
 - 🎵 **DJ Booth** — Phát nhạc + video nền tùy chỉnh
 - ⚙️ **Master Rules** — Tùy chỉnh luật game qua giao diện web, không cần code
 - 🧪 **Test Lab** — Demo mode với người xem giả để test trước khi live
@@ -137,6 +137,7 @@ Truy cập [http://127.0.0.1:3000/control.html](http://127.0.0.1:3000/control.ht
 |------|-----------|
 | `F1` | Ẩn / hiện bảng điều khiển |
 | `F2` | Bật / tắt nền xanh Chroma Key |
+| `F3` | Ẩn / hiện bảng TOP điểm |
 | `F11` | Toàn màn hình |
 
 ---

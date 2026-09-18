@@ -16,6 +16,7 @@ loadEnvironmentFile();
 
 const { normalizeTikFinityMessage } = require('./src/tiktok/normalize-tikfinity-event');
 const { mergeObservedGift } = require('./src/tiktok/observed-gift');
+const { PointsLeaderboard } = require('./src/points-leaderboard');
 const {
     normalizeChat,
     normalizeMember,
@@ -76,6 +77,7 @@ let masterConfig = sanitizeMasterConfig(initialMasterConfig);
 const recentEventIds = new Map();
 const sessionPlayers = new Map();
 const sessionVipScores = new Map();
+const sessionPoints = new PointsLeaderboard();
 const observedGifts = new Map((Array.isArray(initialObservedGifts) ? initialObservedGifts : [])
     .map(gift => [String(gift.giftId || gift.giftName || ''), gift])
     .filter(([key]) => key));
@@ -272,6 +274,7 @@ function resetSessionState(source = metrics.source) {
     metrics = { ...createMetrics(), source, startedAt: source === 'idle' ? null : Date.now() };
     sessionPlayers.clear();
     sessionVipScores.clear();
+    sessionPoints.clear();
     recentEventIds.clear();
 }
 
@@ -280,7 +283,8 @@ function createSnapshot() {
     return {
         type: 'snapshot',
         players: [...sessionPlayers.values()],
-        vipScores: [...sessionVipScores.values()]
+        vipScores: [...sessionVipScores.values()],
+        ...sessionPoints.snapshot()
     };
 }
 
@@ -415,21 +419,29 @@ function emitGameEvent(event) {
         sessionVipScores.set(event.userId, vip);
     }
     if (event.type === 'like') metrics.likes += event.likeCount;
+    // Only accepted, deduplicated events reach this point. diamondCount already
+    // contains the combo total; do not multiply repeatCount again.
+    if (sessionPoints.apply(event)) Object.assign(event, sessionPoints.snapshot());
     broadcast(event);
     broadcastMetrics();
 }
 
-function processGameEvent(inputEvent) {
+function processGameEvent(inputEvent, operatorJoin = false) {
     const safeEvent = sanitizeGameEvent(inputEvent);
     if (!safeEvent) return;
     const event = applyBuiltInChatCommand(applyRule(safeEvent, resolveMasterRule(masterConfig, safeEvent)));
+    // Keep this intent outside the untrusted event payload. Sanitization drops
+    // incoming action fields; only the operator/demo path may request a join.
+    if (operatorJoin && event.type === 'member') event.action = 'join';
     const isKnownPlayer = event.userId && sessionPlayers.has(event.userId);
-    const joinsByKeyword = event.type === 'chat' && event.action === 'join';
+    // Normal live member events have no join action; an explicit member/join
+    // comes from the operator's manual add/demo command.
+    const joinsByAction = (event.type === 'chat' || event.type === 'member') && event.action === 'join';
     const joinsBySocial = event.type === 'follow' || event.type === 'share';
-    event.joinedNow = Boolean((joinsByKeyword || joinsBySocial) && !isKnownPlayer);
+    event.joinedNow = Boolean((joinsByAction || joinsBySocial) && !isKnownPlayer);
     if (metrics.source !== 'demo' && masterConfig.joinMode === 'keyword_only' && !isKnownPlayer) {
         const joinsByGift = event.type === 'gift' && masterConfig.giftAlwaysJoins;
-        event.spectatorOnly = !(joinsByKeyword || joinsByGift || joinsBySocial);
+        event.spectatorOnly = !(joinsByAction || joinsByGift || joinsBySocial);
     }
     if (event.type === 'gift') {
         if (isRealObservedGift(event)) {
@@ -465,11 +477,9 @@ function mockUser(index, manualName = null) {
 function emitDemoMember(index, manualName = null) {
     processGameEvent({
         type: 'member',
-        action: 'join',
-        joinedNow: true,
         eventId: `demo-join-${Date.now()}-${Math.random()}`,
         ...mockUser(index, manualName)
-    });
+    }, true);
 }
 
 function emitDemoAction(action, userIndex = 1, value = 1, giftName = '', manualName = null) {
@@ -611,7 +621,8 @@ async function connectToTikFinity(username, options = {}) {
     });
     connection.on('message', payload => {
         if (!active()) return;
-        for (const event of normalizeTikFinityMessage(payload)) processGameEvent(event);
+        for (const event of normalizeTikFinityMessage(payload))
+            if (!isPendingGiftStreak(event)) processGameEvent(event);
     });
     connection.on('error', error => {
         console.warn(`TikFinity WebSocket: ${error.message}`);

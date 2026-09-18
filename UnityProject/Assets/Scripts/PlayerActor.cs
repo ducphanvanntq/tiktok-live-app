@@ -43,6 +43,7 @@ namespace TikTokLiveGame
         private string avatarUrl;
         private bool spawnDropPending;
         private bool spawnDropping;
+        private Renderer[] overlayRenderers;
         private float spawnDropStartedAt;
 
         private const float SpawnDropHeight = 6f;
@@ -54,6 +55,20 @@ namespace TikTokLiveGame
         public int GiftPower { get; private set; }
         public float LastActiveTime { get; private set; }
         public bool IsTopRanked => topRank > 0;
+        internal int TopRank => topRank;
+
+        internal bool OverlapsScreenRect(Camera camera, Rect rect)
+        {
+            if (!gameObject.activeInHierarchy || visualAlpha < 0.01f) return false;
+            overlayRenderers ??= GetComponentsInChildren<Renderer>(true);
+            foreach (Renderer renderer in overlayRenderers)
+            {
+                if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy) continue;
+                if (renderer is SpriteRenderer sprite && sprite.color.a < 0.01f) continue;
+                if (TopPointsOcclusion.Overlaps(camera, renderer.bounds, rect)) return true;
+            }
+            return false;
+        }
         public bool IsNpc => !string.IsNullOrEmpty(UserId) && UserId.StartsWith("npc-");
         private bool UsesSyntheticAvatar => !string.IsNullOrEmpty(UserId) &&
             (UserId.StartsWith("npc-") || UserId.StartsWith("demo-") || UserId == "master-test");
