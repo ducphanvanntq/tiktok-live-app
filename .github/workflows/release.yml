@@ -1,0 +1,43 @@
+name: Release
+
+# Day 1 tag la ra 1 ban phat hanh:
+#   git tag v1.0.5 && git push origin v1.0.5
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # Dung chung dung mot duong build voi CI thuong, khong chep lai cau hinh.
+    uses: ./.github/workflows/build-windows.yml
+    with:
+      version: ${{ github.ref_name }}
+    # Job Unity can UNITY_EMAIL / UNITY_PASSWORD.
+    secrets: inherit
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Artifact do job `package` cua workflow duoc goi tao ra; workflow con
+      # chay chung mot run nen tai ve duoc bang ten.
+      - uses: actions/download-artifact@v4
+        with:
+          name: WangnguenBrigde-Live-Windows
+          path: dist
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ls -la dist
+          gh release create "$GITHUB_REF_NAME" dist/*.zip \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag
