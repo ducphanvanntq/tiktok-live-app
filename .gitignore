@@ -70,3 +70,6 @@ Desktop.ini
 # ── Crash reports ────────────────────────────
 sysinfo.txt
 crashlytics-build.properties
+
+# Claude
+settings.local.json
