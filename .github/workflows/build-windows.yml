@@ -1,0 +1,87 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'UnityProject/**'
+      - 'TikTokBridge/**'
+      - 'DJ_MUSIC/**'
+      - 'DJ_VIDEO/**'
+      - 'run.bat'
+      - 'scripts/package-windows.sh'
+      - '.github/workflows/build-windows.yml'
+
+concurrency:
+  group: build-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Unity StandaloneWindows64
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The windows-mono editor image is ~15 GB and the runner ships with only
+      # ~14 GB free on /. Drop the preinstalled SDKs we never use.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
+          df -h /
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: UnityProject/Library
+          key: Library-Windows64-${{ hashFiles('UnityProject/Assets/**', 'UnityProject/Packages/**', 'UnityProject/ProjectSettings/**') }}
+          restore-keys: |
+            Library-Windows64-
+            Library-
+
+      - name: Build player
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.2.10f1
+          targetPlatform: StandaloneWindows64
+          projectPath: UnityProject
+          buildName: OngChuMMO_Live
+          # `Semantic` needs git tags, which this repo does not have yet;
+          # `None` keeps bundleVersion from ProjectSettings.asset.
+          versioning: None
+          allowDirtyBuild: true
+
+      # unity-builder runs Unity as root inside the container.
+      - name: Restore ownership
+        run: sudo chown -R "$(id -u):$(id -g)" UnityProject/build UnityProject/Library
+
+      - name: Package release
+        run: bash scripts/package-windows.sh "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/dist"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: OngChuMMO-Live-Windows
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Unity build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-build-log
+          path: |
+            UnityProject/build*.log
+            /home/runner/work/_temp/*.log
+          if-no-files-found: ignore
+          retention-days: 7

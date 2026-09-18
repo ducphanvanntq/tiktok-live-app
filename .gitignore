@@ -25,6 +25,9 @@ UnityProject/Assets/AssetStoreTools/
 # ── Compiled Build output ────────────────────
 Build/
 
+# ── Release packages (scripts/package-windows.sh) ──
+dist/
+
 # ── Build logs ───────────────────────────────
 build_log.txt
 
