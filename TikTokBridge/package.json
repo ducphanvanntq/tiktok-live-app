@@ -2,7 +2,7 @@
   "name": "tiktoklivegame",
   "version": "1.0.0",
   "private": true,
-  "description": "ÔNG CHÚ MMO — TikTok Live Game 3D Bridge | ongchummo.com",
+  "description": "wangnguen-brigde — TikTok Live Game 3D Bridge | github.com/ducphanvanntq/tiktok-live-app",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -12,7 +12,7 @@
     "test": "npm run check && node --test"
   },
   "keywords": [],
-  "author": "ÔNG CHÚ MMO <https://ongchummo.com>",
+  "author": "wangnguen-brigde <https://github.com/ducphanvanntq/tiktok-live-app>",
   "license": "MIT",
   "engines": {
     "node": ">=20"

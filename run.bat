@@ -7,7 +7,7 @@ set "BRIDGE_DIR=%ROOT%TikTokBridge"
 set "BRIDGE_PORT=3000"
 
 echo =======================================
-echo     KHOI DONG ONG CHU MMO LIVE
+echo     KHOI DONG WANGNGUEN-BRIGDE LIVE
 echo =======================================
 echo.
 
@@ -84,8 +84,8 @@ if not "%BRIDGE_PORT%"=="3000" (
     echo Bridge va Control Panel van chay tren cong %BRIDGE_PORT%, nhung game se khong duoc mo.
     goto :open_control
 )
-if exist "%ROOT%Build\OngChuMMO_Live.exe" (
-    start "" "%ROOT%Build\OngChuMMO_Live.exe"
+if exist "%ROOT%Build\WangnguenBrigde_Live.exe" (
+    start "" "%ROOT%Build\WangnguenBrigde_Live.exe"
 ) else if exist "%ROOT%Build\TIKTOK_LIVE_BAR.exe" (
     start "" "%ROOT%Build\TIKTOK_LIVE_BAR.exe"
 ) else (
@@ -101,7 +101,7 @@ exit /b 0
 
 :bridge_is_ready
 set "BRIDGE_READY="
-for /f "usebackq delims=" %%r in (`powershell -NoProfile -Command "try { $h = Invoke-RestMethod -Uri '%CONTROL_URL:control.html=api/health%' -TimeoutSec 2; if ($h.status -eq 'ok' -and $h.appId -eq 'ongchu-mmo-live-bridge') { 'YES' } } catch {}"`) do set "BRIDGE_READY=%%r"
+for /f "usebackq delims=" %%r in (`powershell -NoProfile -Command "try { $h = Invoke-RestMethod -Uri '%CONTROL_URL:control.html=api/health%' -TimeoutSec 2; if ($h.status -eq 'ok' -and $h.appId -eq 'wangnguen-brigde') { 'YES' } } catch {}"`) do set "BRIDGE_READY=%%r"
 exit /b 0
 
 :failed

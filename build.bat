@@ -4,7 +4,7 @@ chcp 65001 >nul
 
 set "ROOT=%~dp0"
 set "PROJECT_DIR=%ROOT%UnityProject"
-set "OUTPUT_EXE=%ROOT%Build\OngChuMMO_Live.exe"
+set "OUTPUT_EXE=%ROOT%Build\WangnguenBrigde_Live.exe"
 set "LOG_FILE=%ROOT%build_log.txt"
 set "PROJECT_VERSION="
 
@@ -48,7 +48,7 @@ if not defined UNITY_EXE (
 )
 
 echo =======================================
-echo     BUILD GAME ONG CHU MMO LIVE
+echo     BUILD GAME WANGNGUEN-BRIGDE LIVE
 echo =======================================
 echo Unity: %PROJECT_VERSION%
 echo Editor: %UNITY_EXE%

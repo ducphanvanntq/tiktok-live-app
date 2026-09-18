@@ -1,4 +1,4 @@
-# 🎵 ÔNG CHÚ MMO — TikTok Live 3D Dance Floor
+# 🎵 wangnguen-brigde — TikTok Live 3D Dance Floor
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-green.svg)](https://nodejs.org/)
@@ -10,7 +10,7 @@
 
 ## 🎬 Video demo thực tế
 
-[![Xem demo ÔNG CHÚ MMO trên TikTok LIVE](docs/media/live-demo.png)](https://www.facebook.com/100004611824062/videos/pcb.3562459197251106/37620662724214707)
+[![Xem demo wangnguen-brigde trên TikTok LIVE](docs/media/live-demo.png)](https://www.facebook.com/100004611824062/videos/pcb.3562459197251106/37620662724214707)
 
 > Nhấn vào ảnh để xem video demo đầy đủ trên Facebook.
 
@@ -45,7 +45,7 @@
 
 ### Cách nhanh nhất trên Windows
 
-1. Tải [`OngChuMMO-Live-Windows-v1.0.5.zip`](https://github.com/cherry9001/tiktok-live-bar/releases/latest/download/OngChuMMO-Live-Windows-v1.0.5.zip) trong mục **Releases**.
+1. Tải [`WangnguenBrigde-Live-Windows-v1.0.5.zip`](https://github.com/cherry9001/tiktok-live-bar/releases/latest/download/WangnguenBrigde-Live-Windows-v1.0.5.zip) trong mục **Releases**.
 2. Giải nén toàn bộ ZIP ra một thư mục mới. Không chạy trực tiếp bên trong ZIP.
 3. Cài [Node.js 20 LTS trở lên](https://nodejs.org/) nếu máy chưa có.
 4. Nhấp đúp `run.bat`. Launcher tự cài thư viện, mở Bridge, Game và Control Panel.
@@ -55,7 +55,7 @@
 Sau khi chạy `run.bat` lần đầu:
 
 - Cửa sổ **TikTok Bridge** hiển thị địa chỉ `http://127.0.0.1:3000`.
-- Trình duyệt mở Control Panel và logo ÔNG CHÚ MMO hiển thị bình thường.
+- Trình duyệt mở Control Panel và logo wangnguen-brigde hiển thị bình thường.
 - Game mở với cửa sổ `TikTokLiveGameUnity` và báo kết nối Node thành công.
 - Gói Windows đã kèm `Build/DJ_MUSIC/nhacnen.MP3`; có thể thay bằng MP3/WAV/OGG của bạn.
 
@@ -225,7 +225,7 @@ Hoặc dùng **Test Lab** trong Control Panel để tạo người xem giả.
 
 ## 📺 Ghép vào OBS
 
-1. Thêm source **Game Capture** → chọn cửa sổ ÔNG CHÚ MMO Live
+1. Thêm source **Game Capture** → chọn cửa sổ wangnguen-brigde Live
 2. Bấm **F2** trong game để bật Chroma Key (nền xanh)
 3. Trong OBS: thêm filter **Chroma Key** → chọn màu xanh
 
@@ -241,12 +241,11 @@ Tài nguyên bên thứ ba (GIF, hình ảnh) có thể có giấy phép riêng 
 
 ## 📞 Liên hệ
 
-- 🌐 Website: [ongchummo.com](https://ongchummo.com)
-- 📱 Zalo: 0977.896.644
-- 📧 Email: toanhvan90@gmail.com
+- 📧 Email: wangnguenlc79@gmail.com
+- 💻 Mã nguồn: [github.com/ducphanvanntq/tiktok-live-app](https://github.com/ducphanvanntq/tiktok-live-app)
 
 ---
 
 <p align="center">
-  Made with ❤️ by <strong>ÔNG CHÚ MMO</strong>
+  Made with ❤️ by <strong>wangnguen-brigde</strong>
 </p>

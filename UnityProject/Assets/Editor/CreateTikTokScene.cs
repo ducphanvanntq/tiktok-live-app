@@ -58,13 +58,13 @@ namespace TikTokLiveGame.Editor
 
             try
             {
-                PlayerSettings.companyName = "ÔNG CHÚ MMO";
-                PlayerSettings.productName = "ÔNG CHÚ MMO Live";
+                PlayerSettings.companyName = "wangnguen-brigde";
+                PlayerSettings.productName = "wangnguen-brigde Live";
                 PlayerSettings.SetScriptingBackend(target, ScriptingImplementation.IL2CPP);
                 PlayerSettings.SetManagedStrippingLevel(target, ManagedStrippingLevel.Medium);
                 PlayerSettings.stripEngineCode = true;
 
-                string outputPath = Path.GetFullPath("CommercialBuild/OngChuMMO_Live.exe");
+                string outputPath = Path.GetFullPath("CommercialBuild/WangnguenBrigde_Live.exe");
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
                 string[] scenes = System.Array.ConvertAll(
                     System.Array.FindAll(EditorBuildSettings.scenes, scene => scene.enabled),

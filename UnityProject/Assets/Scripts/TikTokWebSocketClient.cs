@@ -11,7 +11,7 @@ namespace TikTokLiveGame
 {
     public sealed class TikTokWebSocketClient : MonoBehaviour
     {
-        [SerializeField] private string serverUrl = "ws://127.0.0.1:3000";
+        [SerializeField] private string serverUrl = "ws://127.0.0.1:8085";
         [SerializeField] private int reconnectDelayMs = 2000;
         private readonly ConcurrentQueue<string> inbox = new();
         private ClientWebSocket socket;
