@@ -1,0 +1,152 @@
+{
+  "status": "assets_prepared_not_integrated",
+  "generator": "built-in image_gen",
+  "atlas": {
+    "file": "butterfly-flap-atlas.png",
+    "width": 1254,
+    "height": 1254,
+    "mode": "RGBA",
+    "sha256": "ee8e0786732f85d5b8c9bc6d495d1d18f77b384a561538da880c97a361146efb",
+    "transparentPixelFraction": 0.894779,
+    "frameOrder": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "frames": [
+      {
+        "index": 0,
+        "name": "open",
+        "rectTopLeft": [
+          0,
+          0,
+          627,
+          627
+        ],
+        "contentBoundsInCellTopLeft": [
+          213,
+          257,
+          526,
+          547
+        ],
+        "suggestedPivotUnityNormalized": [
+          0.589314,
+          0.358852
+        ]
+      },
+      {
+        "index": 1,
+        "name": "half_closing",
+        "rectTopLeft": [
+          627,
+          0,
+          627,
+          627
+        ],
+        "contentBoundsInCellTopLeft": [
+          201,
+          252,
+          400,
+          546
+        ],
+        "suggestedPivotUnityNormalized": [
+          0.479266,
+          0.363636
+        ]
+      },
+      {
+        "index": 2,
+        "name": "closed",
+        "rectTopLeft": [
+          0,
+          627,
+          627,
+          627
+        ],
+        "contentBoundsInCellTopLeft": [
+          319,
+          140,
+          418,
+          430
+        ],
+        "suggestedPivotUnityNormalized": [
+          0.587719,
+          0.545455
+        ]
+      },
+      {
+        "index": 3,
+        "name": "half_opening",
+        "rectTopLeft": [
+          627,
+          627,
+          627,
+          627
+        ],
+        "contentBoundsInCellTopLeft": [
+          201,
+          142,
+          400,
+          436
+        ],
+        "suggestedPivotUnityNormalized": [
+          0.479266,
+          0.539075
+        ]
+      }
+    ],
+    "notes": "Use supplied custom pivots to compensate for generated art placement. Verify flap alignment in game."
+  },
+  "preview": {
+    "file": "color-themes-preview.png",
+    "type": "static_design_reference"
+  },
+  "proposedMotion": {
+    "butterflyCount": 12,
+    "maxButterflies": 16,
+    "flapFramesPerSecond": 12,
+    "randomInitialFlapPhase": true,
+    "entranceSeconds": 0.3,
+    "holdSeconds": 2,
+    "exitSeconds": 0.4,
+    "placement": "random_lower_screen_per_welcome",
+    "avoidAvatarAndText": true
+  },
+  "proposedThemes": [
+    {
+      "id": "leaf",
+      "background": "#0D2114",
+      "border": "#A3E635",
+      "text": "#F1F8E9",
+      "butterflies": [
+        "#BEF264",
+        "#FF80AB",
+        "#F1F8E9"
+      ]
+    },
+    {
+      "id": "orchid",
+      "background": "#241033",
+      "border": "#D8A4FF",
+      "text": "#F1F8E9",
+      "butterflies": [
+        "#D8A4FF",
+        "#FF80AB",
+        "#F1F8E9"
+      ]
+    },
+    {
+      "id": "lagoon",
+      "background": "#08262E",
+      "border": "#67E8F9",
+      "text": "#F1F8E9",
+      "butterflies": [
+        "#67E8F9",
+        "#A5F3FC",
+        "#F1F8E9"
+      ]
+    }
+  ],
+  "themeSelection": "Choose one palette once per welcome; avoid immediate repeats. Do not randomize each RGB channel independently."
+}
