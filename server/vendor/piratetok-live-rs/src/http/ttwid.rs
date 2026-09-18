@@ -1,12 +1,16 @@
 use crate::errors::TikTokLiveError;
 use crate::http::ua::random_ua;
 
-const TIKTOK_URL: &str = "https://www.tiktok.com/";
+// Upstream used "https://www.tiktok.com/", which stopped issuing ttwid — that
+// response now carries no Set-Cookie header at all, so every live connection
+// died with "no ttwid cookie in tiktok.com response" right after joining the
+// room. The /live landing page still sets it. See VENDOR-PATCH.md.
+const TIKTOK_URL: &str = "https://www.tiktok.com/live";
 
 /// Fetch a fresh ttwid cookie from TikTok via unauthenticated GET.
 ///
-/// The ttwid is a device fingerprint token set via `Set-Cookie` on any
-/// request to tiktok.com. It requires no login, no signing, no browser.
+/// The ttwid is a device fingerprint token set via `Set-Cookie` on the live
+/// landing page. It requires no login, no signing, no browser.
 /// This is the sole credential needed for WSS live stream connections.
 ///
 /// Uses a random UA from the built-in pool. Pass a custom UA to override.

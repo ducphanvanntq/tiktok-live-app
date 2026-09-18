@@ -1,7 +1,7 @@
 # 🎵 wangnguen-brigde — TikTok Live 3D Dance Floor
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-green.svg)](https://nodejs.org/)
+[![Rust](https://img.shields.io/badge/Rust-%3E%3D1.85-orange.svg)](https://rustup.rs/)
 [![Unity](https://img.shields.io/badge/Unity-6000.x-black.svg)](https://unity.com/)
 
 **Biến phiên TikTok LIVE thành sàn nhảy 3D tương tác** — Người xem gửi gift, chat, like, follow sẽ xuất hiện trên sàn nhảy với avatar TikTok thật, hiệu ứng ánh sáng, DJ booth và pháo hoa.
@@ -33,11 +33,14 @@
 
 | Phần mềm | Phiên bản |
 |-----------|-----------|
-| **Node.js** | ≥ 20.x |
-| **Unity** | Chỉ cần khi tự build source; dùng đúng 6000.2.10f1 |
-| **TikFinity Desktop** | Phiên bản mới nhất |
-| **OBS Studio** | Khuyến nghị cho streaming |
 | **Windows** | 10 / 11 (64-bit) |
+| **Rust** | Chỉ cần khi tự build source; ≥ 1.85 ([rustup](https://rustup.rs/)) |
+| **Unity** | Chỉ cần khi tự build source; dùng đúng 6000.2.10f1 |
+| **TikFinity Desktop** | Chỉ cần khi dùng `LIVE_PROVIDER=tikfinity` |
+| **OBS Studio** | Khuyến nghị cho streaming |
+
+> Gói phát hành **không cần cài gì thêm** — server là một file `.exe` đơn lẻ,
+> không còn phụ thuộc Node.js như các bản trước.
 
 ---
 
@@ -45,24 +48,22 @@
 
 ### Cách nhanh nhất trên Windows
 
-1. Tải [`WangnguenBrigde-Live-Windows-v1.0.5.zip`](https://github.com/cherry9001/tiktok-live-bar/releases/latest/download/WangnguenBrigde-Live-Windows-v1.0.5.zip) trong mục **Releases**.
+1. Tải file `WangnguenBrigde-Live-Windows-v*.zip` mới nhất ở mục [**Releases**](https://github.com/cherry9001/tiktok-live-bar/releases/latest).
 2. Giải nén toàn bộ ZIP ra một thư mục mới. Không chạy trực tiếp bên trong ZIP.
-3. Cài [Node.js 20 LTS trở lên](https://nodejs.org/) nếu máy chưa có.
-4. Nhấp đúp `run.bat`. Launcher tự cài thư viện, mở Bridge, Game và Control Panel.
+3. Nhấp đúp `run.bat`. Launcher tự mở Server, Game và Control Panel.
 
 ### Dấu hiệu cài đặt thành công
 
 Sau khi chạy `run.bat` lần đầu:
 
-- Cửa sổ **TikTok Bridge** hiển thị địa chỉ `http://127.0.0.1:3000`.
+- Cửa sổ **TikTok Server** hiển thị địa chỉ `http://127.0.0.1:8085`.
 - Trình duyệt mở Control Panel và logo wangnguen-brigde hiển thị bình thường.
-- Game mở với cửa sổ `TikTokLiveGameUnity` và báo kết nối Node thành công.
+- Game mở và báo kết nối server thành công.
 - Gói Windows đã kèm `Build/DJ_MUSIC/nhacnen.MP3`; có thể thay bằng MP3/WAV/OGG của bạn.
 
-Luồng trên đã được kiểm thử trọn vẹn từ ZIP sạch trên Windows 11: launcher tự
-chạy `npm ci`, Bridge/Control Panel/WebSocket hoạt động và game kết nối cổng 3000.
+Lần chạy đầu tiên launcher tự tạo `Server\.env` từ `Server\.env.example`.
 
-> `run.bat` không tự tắt chương trình khác đang dùng cổng 3000. Nếu launcher báo
+> `run.bat` không tự tắt chương trình khác đang dùng cổng 8085. Nếu launcher báo
 > xung đột cổng, hãy đóng đúng chương trình được báo rồi chạy lại để tránh mất dữ liệu.
 
 > **Không tải “Source code (zip)” nếu bạn chỉ muốn chơi.** File source tự động của
@@ -75,44 +76,65 @@ git clone https://github.com/cherry9001/tiktok-live-bar.git
 cd tiktok-live-bar
 ```
 
-Source GitHub không chứa game đã biên dịch. Cài Unity `6000.2.10f1`, sau đó chạy
-`build.bat` hoặc mở `UnityProject/` bằng Unity Hub để tạo thư mục `Build`.
+Source GitHub không chứa game đã biên dịch. Cài [Rust](https://rustup.rs/) và Unity
+`6000.2.10f1`, sau đó chạy `build.bat`.
 
-### Chạy thủ công — Cài đặt Node Bridge
+### Build thủ công — một lệnh ra trọn gói phát hành
+
+```bat
+build.bat
+```
+
+`build.bat` làm tuần tự 3 việc:
+
+| Bước | Việc | Kết quả |
+|---|---|---|
+| 1 | `cargo build --release` | `server\target\release\tiktok-server.exe` |
+| 2 | Unity batchmode build | `Build\TikTokBarGame.exe` |
+| 3 | `scripts/package-windows.sh` | `dist\WangnguenBrigde-Live-Windows-v<version>.zip` |
+
+Bước 3 cần Git Bash (đi kèm Git for Windows). Nếu chỉ muốn đóng gói lại từ bản
+build có sẵn thì chạy riêng:
 
 ```bash
-cd TikTokBridge
-copy .env.example .env
-npm ci
-npm start
+bash scripts/package-windows.sh
+```
+
+Đặt biến `VERSION` để ghi đè số phiên bản trong tên file ZIP; nếu không, script lấy
+theo tag git trên HEAD, rồi mới đến `bundleVersion` trong `ProjectSettings.asset`.
+
+### Chạy server thủ công khi phát triển
+
+```bash
+cd server
+cp .env.example .env
+cargo run
 ```
 
 ### Mở Control Panel
 
-Truy cập [http://127.0.0.1:3000/control.html](http://127.0.0.1:3000/control.html) trên trình duyệt.
-
-### Chạy Unity Game
-
-- **Nếu có file build:** Chạy `run.bat`
-- **Nếu clone source:** Cài Unity `6000.2.10f1`, rồi chạy `build.bat`
+Truy cập [http://127.0.0.1:8085/control.html](http://127.0.0.1:8085/control.html) trên trình duyệt.
 
 ### Kết nối TikTok LIVE
 
-1. Mở TikFinity Desktop → đăng nhập → bật LIVE
-2. Trong Control Panel, nhập username TikTok đang live → **Kết nối**
+- **`LIVE_PROVIDER=tiktok`** (mặc định trong `.env.example`) — nối thẳng TikTok,
+  không cần API key. Nhập username TikTok đang live vào Control Panel → **Kết nối**.
+- **`LIVE_PROVIDER=tikfinity`** — đường lui: mở TikFinity Desktop → đăng nhập →
+  bật LIVE, rồi kết nối như trên.
 
 ---
 
 ## 📁 Cấu trúc thư mục
 
 ```
-├── TikTokBridge/          # Node.js backend — bridge TikTok ↔ Unity
-│   ├── server.js          # Server chính
+├── server/                # Rust + Axum backend — bridge TikTok ↔ Unity
+│   ├── src/               # domain / live / session / transport
 │   ├── config/            # Cấu hình game, gifts, master rules
 │   ├── public/            # Control panel (HTML/JS/CSS)
-│   ├── src/               # Logic xử lý sự kiện, bảo mật
-│   ├── assets/            # Banner, GIF hiệu ứng
-│   └── test/              # Unit tests
+│   └── vendor/            # piratetok-live-rs đã patch cho Windows
+│
+├── TikTokBridge/          # Bản Node.js cũ — giữ làm đường lui khi phát triển,
+│   └── assets/            # không còn nằm trong gói phát hành. Banner, GIF hiệu ứng.
 │
 ├── UnityProject/          # Unity 6 — Game 3D
 │   ├── Assets/Scripts/    # C# scripts (24 files)
@@ -120,13 +142,25 @@ Truy cập [http://127.0.0.1:3000/control.html](http://127.0.0.1:3000/control.ht
 │
 ├── DJ_MUSIC/              # 🎵 Thả file nhạc MP3/WAV/OGG vào đây
 ├── DJ_VIDEO/              # 🎬 Thả file video MP4/PNG vào đây
-├── LiveAssets/             # Hình nền, GIF hiệu ứng
-├── Build/                 # Có trong gói Release; không có trong source Git
+├── LiveAssets/            # Hình nền, GIF hiệu ứng
+├── Build/                 # Output Unity; không có trong source Git
+├── dist/                  # Output đóng gói; không có trong source Git
 │
-├── build.bat              # Script build Unity → EXE
-├── run.bat                # Script chạy Node + Game
+├── scripts/
+│   └── package-windows.sh # Gộp game + server thành 1 file ZIP phát hành
+├── build.bat              # Build server + game, rồi đóng gói
+├── run.bat                # Chạy server + game
 ├── LICENSE                # Giấy phép MIT
 └── README.md              # File này
+```
+
+Bố cục bên trong gói phát hành:
+
+```
+WangnguenBrigde-Live-Windows-v<version>/
+├── run.bat
+├── Build/                 # Game Unity + DJ_MUSIC + DJ_VIDEO
+└── Server/                # tiktok-server.exe + config/ + public/ + assets/
 ```
 
 ---
@@ -183,28 +217,26 @@ Mở Control Panel → tab **⚙️ Master Rules** để:
 - Chọn chế độ tham gia sàn (chat keyword hoặc mọi tương tác)
 - Bật/tắt tự động vào sàn khi tặng gift
 
-### Cấu hình Node Bridge
+### Cấu hình Server
 
-Sửa file `TikTokBridge/.env`:
+Sửa file `Server/.env` (trong gói phát hành) hoặc `server/.env` (khi chạy source):
 
 ```env
-NODE_ENV=production
 HOST=127.0.0.1
-PORT=3000
-LIVE_PROVIDER=tikfinity
+PORT=8085
+LIVE_PROVIDER=tiktok
 TIKFINITY_WS_URL=ws://127.0.0.1:21213/
-ALLOW_LAN=0
 ```
 
-Bridge thực sự nạp file `.env` khi khởi động. Biến môi trường của Windows được ưu
-tiên nếu cùng tên. Bản game dựng sẵn kết nối cố định tới cổng `3000`; chỉ đổi
-`PORT` khi bạn dùng riêng Control Panel/Bridge hoặc đã tự build lại Unity client.
+Server nạp file `.env` khi khởi động; biến môi trường của Windows được ưu tiên nếu
+cùng tên. Bản game dựng sẵn kết nối cố định tới cổng `8085` — chỉ đổi `PORT` khi bạn
+dùng riêng Control Panel hoặc đã sửa `serverUrl` trong
+`UnityProject/Assets/Scripts/TikTokWebSocketClient.cs` rồi build lại Unity client.
 
 ### Xử lý lỗi cài đặt thường gặp
 
-- **`node` hoặc `npm` không được nhận diện:** cài Node.js 20+, đóng cửa sổ cũ rồi chạy lại `run.bat`.
-- **`npm ci` thất bại:** kiểm tra kết nối Internet, tắt proxy/VPN lỗi và chạy lại; không sao chép `node_modules` từ máy khác.
-- **Cổng 3000 đang bị chiếm:** đóng đúng ứng dụng/PID được launcher báo; launcher không tự tắt ứng dụng khác.
+- **Không tìm thấy `tiktok-server.exe`:** bạn chưa giải nén hết ZIP, hoặc đang chạy source mà chưa chạy `build.bat`.
+- **Cổng 8085 đang bị chiếm:** đóng đúng ứng dụng/PID được launcher báo; launcher không tự tắt ứng dụng khác.
 - **Không tìm thấy game:** bạn đã tải Source ZIP hoặc clone Git. Hãy tải bản Windows trong Releases hoặc tự build bằng Unity.
 - **Windows SmartScreen cảnh báo:** chọn **More info → Run anyway** nếu file được tải từ Release chính thức của repo này.
 - **TikTok chưa có sự kiện:** mở TikFinity, kiểm tra WebSocket `ws://127.0.0.1:21213/`, sau đó thử **Test Lab** trước.
@@ -214,9 +246,8 @@ tiên nếu cùng tên. Bản game dựng sẵn kết nối cố định tới c
 ## 🧪 Test
 
 ```bash
-cd TikTokBridge
-npm test                    # Chạy unit tests
-npm run security:smoke      # Test bảo mật WebSocket
+cd server
+cargo test
 ```
 
 Hoặc dùng **Test Lab** trong Control Panel để tạo người xem giả.

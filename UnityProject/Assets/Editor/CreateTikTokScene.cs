@@ -31,7 +31,7 @@ namespace TikTokLiveGame.Editor
             CreateDjAnimatorController();
             EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Standalone, BuildTarget.StandaloneWindows64);
             ForceWindowsX64BuildProfile();
-            string outputPath = Path.GetFullPath("Builds/TikTokLiveGameUnity.exe");
+            string outputPath = Path.GetFullPath("Builds/TikTokBarGame.exe");
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
             string[] scenes = System.Array.ConvertAll(
                 System.Array.FindAll(EditorBuildSettings.scenes, scene => scene.enabled),
@@ -64,7 +64,7 @@ namespace TikTokLiveGame.Editor
                 PlayerSettings.SetManagedStrippingLevel(target, ManagedStrippingLevel.Medium);
                 PlayerSettings.stripEngineCode = true;
 
-                string outputPath = Path.GetFullPath("CommercialBuild/WangnguenBrigde_Live.exe");
+                string outputPath = Path.GetFullPath("CommercialBuild/TikTokBarGame.exe");
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
                 string[] scenes = System.Array.ConvertAll(
                     System.Array.FindAll(EditorBuildSettings.scenes, scene => scene.enabled),
