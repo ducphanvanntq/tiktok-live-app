@@ -37,7 +37,8 @@ namespace TikTokLiveGame
             if (welcomeDirectory != null)
             {
                 VisualCaptureHarness preview = root.AddComponent<VisualCaptureHarness>();
-                preview.StartCoroutine(preview.CaptureWelcome(welcomeDirectory));
+                bool npcPreview = Array.IndexOf(Environment.GetCommandLineArgs(), "-npcPreview") >= 0;
+                preview.StartCoroutine(npcPreview ? preview.CaptureNpc(welcomeDirectory) : preview.CaptureWelcome(welcomeDirectory));
                 return;
             }
             string[] arguments = Environment.GetCommandLineArgs();
@@ -192,6 +193,112 @@ namespace TikTokLiveGame
             Debug.Log("WELCOME_PREVIEW_OK");
             yield return new WaitForSecondsRealtime(1f);
             Application.Quit();
+        }
+
+        private IEnumerator CaptureNpc(string directory)
+        {
+            System.IO.Directory.CreateDirectory(directory);
+            yield return new WaitForSecondsRealtime(2.5f);
+            PlayerManager manager = GetComponentInChildren<PlayerManager>();
+            TikTokGameController game = GetComponent<TikTokGameController>();
+            Require(GetComponent<TikTokWebSocketClient>() == null, "NPC preview must not create a live transport.");
+            Require(manager.NpcTarget == 20 && manager.NpcCount == 20 && manager.ViewerCount == 0,
+                "An empty room must start with twenty NPCs.");
+            var originalNpcs = new PlayerActor[20];
+            var originalNames = new System.Collections.Generic.HashSet<string>();
+            var nameLog = new System.Text.StringBuilder();
+            for (int i = 0; i < originalNpcs.Length; i++)
+            {
+                PlayerActor npc = manager.Find($"npc-{i:000}");
+                Require(npc != null && originalNames.Add(npc.Nickname), "Every NPC must have a distinct name.");
+                originalNpcs[i] = npc;
+                nameLog.Append(npc.UserId).Append(": ").Append(npc.Nickname).Append('\n');
+            }
+            var names = new NpcNamePool(20260918);
+            var fullDeck = new System.Collections.Generic.HashSet<string>();
+            var noOccupiedNames = new System.Collections.Generic.HashSet<string>();
+            Require(NpcNamePool.Count >= 1500, "The expanded name pool must offer at least 1,500 names.");
+            for (int i = 0; i < NpcNamePool.Count; i++)
+                Require(fullDeck.Add(names.Next(noOccupiedNames)), "The shuffled name deck must not repeat before exhaustion.");
+            for (int i = 0; i < 40; i++)
+                Require(!originalNames.Contains(names.Next(originalNames)), "A reshuffled deck must skip names still occupied on stage.");
+            yield return new WaitForEndOfFrame();
+            ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(directory, "npc-20-empty.png"));
+            Debug.Log($"NPC_SAMPLE empty: npc={manager.NpcCount}, viewers={manager.ViewerCount}, namePool={NpcNamePool.Count}");
+
+            Action<TikTokEvent> emit = data => game.SendMessage("HandleEvent", data);
+            for (int i = 0; i < 12; i++)
+                emit(new TikTokEvent { type = "like", userId = "crowd-preview-viewer-" + i, nickname = "Khách " + (i + 1) });
+            VerifyNpcInstances(manager, originalNpcs, originalNames);
+            Require(manager.ViewerCount == 12 && manager.Count == 32 && manager.UniqueSlotCount == 32,
+                "Twelve viewers must coexist with all twenty NPCs in distinct slots.");
+            yield return new WaitForSecondsRealtime(2f);
+            yield return new WaitForEndOfFrame();
+            ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(directory, "npc-20-with-12-viewers.png"));
+            Debug.Log($"NPC_SAMPLE joined: npc={manager.NpcCount}, viewers={manager.ViewerCount}, slots={manager.UniqueSlotCount}");
+
+            emit(new TikTokEvent { type = "snapshot", players = new[]
+            {
+                new TikTokPlayerData { userId = "crowd-preview-viewer-0", nickname = "Khách 1" },
+                new TikTokPlayerData { userId = "crowd-preview-viewer-1", nickname = "Khách 2" },
+                new TikTokPlayerData { userId = "crowd-preview-viewer-1", nickname = "Duplicate" },
+                new TikTokPlayerData { userId = "npc-000", nickname = "Unexpected remote NPC" }
+            } });
+            VerifyNpcInstances(manager, originalNpcs, originalNames);
+            Require(manager.ViewerCount == 2 && manager.UniqueSlotCount == 22,
+                "Reconnect must replace viewers without recreating NPCs or duplicating slots.");
+            emit(new TikTokEvent { type = "like", userId = "npc-999", nickname = "Unexpected NPC event" });
+            Require(manager.Find("npc-999") == null && manager.NpcCount == 20, "Remote events must not create extra NPCs.");
+
+            for (int i = 2; i < manager.ViewerCapacity; i++)
+                manager.Handle(new TikTokEvent { type = "like", userId = "crowd-preview-viewer-" + i, nickname = "Khách " + (i + 1) });
+            VerifyNpcInstances(manager, originalNpcs, originalNames);
+            Require(manager.ViewerCount == 400 && manager.Count == 420 && manager.UniqueSlotCount == 420,
+                "The floor must fit 400 viewers plus twenty persistent NPCs without shared slots.");
+            manager.Handle(new TikTokEvent { type = "like", userId = "crowd-preview-overflow", nickname = "Khách mới" });
+            VerifyNpcInstances(manager, originalNpcs, originalNames);
+            Require(manager.Find("crowd-preview-overflow") != null && manager.ViewerCount == 400 && manager.UniqueSlotCount == 420,
+                "At the viewer cap, eviction must remove an old viewer and preserve every NPC.");
+            yield return new WaitForSecondsRealtime(2f);
+            yield return new WaitForEndOfFrame();
+            ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(directory, "npc-20-with-400-viewers.png"));
+            Debug.Log($"NPC_SAMPLE capacity: npc={manager.NpcCount}, viewers={manager.ViewerCount}, slots={manager.UniqueSlotCount}");
+
+            manager.RemoveInactiveViewers(Time.unscaledTime + 601f);
+            VerifyNpcInstances(manager, originalNpcs, originalNames);
+            Require(manager.ViewerCount == 0 && manager.Count == 20, "Viewer expiry must leave all twenty NPCs on stage.");
+            var roster = new TikTokPlayerData[405];
+            for (int i = 0; i < roster.Length; i++)
+                roster[i] = new TikTokPlayerData { userId = "crowd-preview-roster-" + i, nickname = "Khách " + (i + 1) };
+            manager.Handle(new TikTokEvent { type = "snapshot", players = roster });
+            VerifyNpcInstances(manager, originalNpcs, originalNames);
+            Require(manager.ViewerCount == 400 && manager.UniqueSlotCount == 420, "Oversized snapshots must respect the separate viewer budget.");
+
+            emit(new TikTokEvent { type = "reset" });
+            Require(manager.NpcCount == 20 && manager.ViewerCount == 0, "Reset must create a fresh twenty-NPC crowd.");
+            var resetNames = new System.Collections.Generic.HashSet<string>();
+            for (int i = 0; i < 20; i++)
+            {
+                string name = manager.Find($"npc-{i:000}").Nickname;
+                Require(resetNames.Add(name) && !originalNames.Contains(name), "A fresh crowd must draw twenty new names from the deck.");
+            }
+            yield return new WaitForSecondsRealtime(2f);
+            yield return new WaitForEndOfFrame();
+            ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(directory, "npc-20-after-reset.png"));
+            System.IO.File.WriteAllText(System.IO.Path.Combine(directory, "npc-names.txt"), nameLog.ToString());
+            System.IO.File.WriteAllText(System.IO.Path.Combine(directory, "npc-verification.txt"),
+                $"PASS: {NpcNamePool.Count} unique shuffled names, 20 distinct NPCs at startup/reset, persistent identities on joins/reconnect/eviction/expiry, 400 viewers plus 20 NPCs, 420 unique slots, bounded oversized snapshots.\n");
+            Debug.Log("NPC_PREVIEW_OK");
+            yield return new WaitForSecondsRealtime(1f);
+            Application.Quit();
+        }
+
+        private static void VerifyNpcInstances(PlayerManager manager, PlayerActor[] originals, System.Collections.Generic.ISet<string> names)
+        {
+            Require(manager.NpcCount == originals.Length, "The persistent NPC count must not change when viewers arrive or leave.");
+            for (int i = 0; i < originals.Length; i++)
+                Require(originals[i] != null && manager.Find($"npc-{i:000}") == originals[i] && names.Contains(originals[i].Nickname),
+                    "NPC objects and names must survive viewer roster changes.");
         }
 
         private static void Require(bool condition, string message)

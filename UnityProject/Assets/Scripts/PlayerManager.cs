@@ -10,36 +10,28 @@ namespace TikTokLiveGame
     {
         [SerializeField] private int maxPlayers = 400;
         [SerializeField] private float playerTtlSeconds = 600f;
-        [SerializeField] private int npcCrowdTarget = 5;
+        [SerializeField] private int npcCrowdTarget = 20;
         private readonly Dictionary<string, PlayerActor> players = new();
         private readonly List<string> playerOrder = new();
         private readonly Dictionary<string, int> crowdSlots = new();
         private int focusVersion;
         private string focusedUserId;
-        private float nextNpcRefillAt;
+        private readonly NpcNamePool npcNames = new();
         private const float NpcAmbientAlpha = 1f;
         private const float FocusedCrowdAlpha = 0.22f;
         private const float FocusedNpcAlpha = 0.14f;
         private const float FocusedTopAlpha = 0.4f;
         private const int CrowdColumns = 24;
-        private const int CrowdRows = 17;
+        private const int CrowdRows = 18;
         private const int CrowdCapacity = CrowdColumns * CrowdRows;
 
-        private static readonly string[] NpcNames =
-        {
-            "Bắp Rang", "Cà Khịa", "Tí Tởn", "Tèo Teo", "Bảy Bóng", "Sáu Lắc", "Năm Rung", "Út Quẩy",
-            "Cô Ba Lắc", "Chú Tư Nhún", "Anh Hai Quẩy", "Bé Hột Mít", "Mèo Mập", "Heo Hay Hờn", "Gà Mơ", "Vịt Lộn",
-            "Cá Khô", "Mực Một Nắng", "Bánh Bao", "Bánh Bèo", "Bún Đậu", "Mắm Tôm", "Chả Lụa", "Trà Đá",
-            "Sữa Đậu", "Khoai Lang", "Đậu Phộng", "Hạt Dưa", "Xoài Lắc", "Cóc Dầm", "Chanh Chua", "Ớt Hiểm",
-            "Củ Cải", "Rau Răm", "Hành Phi", "Tỏi Bay", "Gừng Cay", "Muối Tiêu", "Nước Mắm", "Cơm Nguội",
-            "Dép Tổ Ong", "Quần Hoa", "Áo Bông", "Tóc Dựng", "Răng Khểnh", "Má Bánh Bao", "Mắt Hí", "Bụng Bự",
-            "Chân Ngắn", "Cổ Cao", "Đầu Nấm", "Mặt Ngầu", "Hay Dỗi", "Hay Cười", "Thích Quẩy", "Lười Nhảy",
-            "Ngủ Gật", "Đi Trễ", "Quên Dép", "Mất Sóng", "Hết Pin", "Kẹt Xe", "Rớt Mạng", "Đang Ăn",
-            "Chưa Tắm", "No Căng", "Say Nhẹ", "Khát Nước", "Lạc Trôi", "Quẩy Dở", "Nhún Sai", "Lắc Nhầm",
-            "Cười Xỉu", "Tưng Tửng", "Ngơ Ngác", "Hơi Mệt", "Rất Ổn", "Không Sao", "Bình Tĩnh", "Vui Vẻ"
-        };
 
         public int Count => players.Count;
+        public int NpcCount => players.Values.Count(actor => actor.IsNpc);
+        public int ViewerCount => Count - NpcCount;
+        internal int ViewerCapacity => Mathf.Clamp(maxPlayers, 1, 400);
+        internal int NpcTarget => Mathf.Clamp(npcCrowdTarget, 0, 20);
+        internal int UniqueSlotCount => crowdSlots.Values.Distinct().Count();
         public PlayerActor Find(string userId) => !string.IsNullOrWhiteSpace(userId) && players.TryGetValue(userId, out PlayerActor actor) ? actor : null;
 
         public bool TryGetCrowdBounds(out Bounds bounds)
@@ -108,7 +100,9 @@ namespace TikTokLiveGame
 
         public PlayerActor GetOrCreate(TikTokEvent data)
         {
-            if (string.IsNullOrWhiteSpace(data.userId)) return null;
+            // NPC identities belong to this manager; incoming viewer events must
+            // not rename them or create additional synthetic crowd members.
+            if (data == null || string.IsNullOrWhiteSpace(data.userId) || data.userId.StartsWith("npc-", System.StringComparison.Ordinal)) return null;
             if (players.TryGetValue(data.userId, out PlayerActor existing))
             {
                 existing.UpdateIdentity(data);
@@ -116,7 +110,6 @@ namespace TikTokLiveGame
                 return existing;
             }
 
-            if (players.Count >= maxPlayers) RemoveOldest();
             TikTokPlayerData playerData = new()
             {
                 userId = data.userId,
@@ -137,9 +130,20 @@ namespace TikTokLiveGame
             }
             if (data.type == "snapshot")
             {
-                Clear();
+                // A reconnect replaces the server roster, not the local crowd.
+                // Preserve NPC instances, names, animation clocks and floor slots.
+                focusVersion++;
+                focusedUserId = null;
+                foreach (string id in playerOrder.Where(id => !players[id].IsNpc).ToArray()) Remove(id);
+                foreach (PlayerActor npc in players.Values)
+                {
+                    npc.SetGiftFocus(false);
+                    npc.SetVisibility(NpcAmbientAlpha);
+                }
                 foreach (TikTokPlayerData player in data.players ?? System.Array.Empty<TikTokPlayerData>())
-                    Create(player);
+                    if (player != null && !string.IsNullOrWhiteSpace(player.userId) && !player.userId.StartsWith("npc-", System.StringComparison.Ordinal))
+                        Create(player);
+                EnsureNpcCrowd();
                 return;
             }
             if (data.type is not ("member" or "chat" or "gift" or "like" or "follow" or "share")) return;
@@ -191,8 +195,9 @@ namespace TikTokLiveGame
         private PlayerActor Create(TikTokPlayerData data)
         {
             if (data == null || string.IsNullOrWhiteSpace(data.userId)) return null;
-            bool isNpc = data.userId.StartsWith("npc-");
-            if (!isNpc) RemoveOneNpc();
+            if (players.TryGetValue(data.userId, out PlayerActor existing)) return existing;
+            bool isNpc = data.userId.StartsWith("npc-", System.StringComparison.Ordinal);
+            if (!isNpc && ViewerCount >= ViewerCapacity) RemoveOldestViewer();
             int index = players.Count;
 
             GameObject playerObject = new($"Player_{data.userId}");
@@ -277,10 +282,14 @@ namespace TikTokLiveGame
 
         private void Update()
         {
-            float cutoff = Time.unscaledTime - playerTtlSeconds;
+            RemoveInactiveViewers(Time.unscaledTime);
+        }
+
+        internal void RemoveInactiveViewers(float now)
+        {
+            float cutoff = now - playerTtlSeconds;
             foreach (string id in players.Where(pair => !pair.Value.IsNpc && pair.Value.LastActiveTime < cutoff).Select(pair => pair.Key).ToArray())
                 Remove(id);
-            if (Time.unscaledTime >= nextNpcRefillAt) EnsureNpcCrowd();
         }
 
         public void Clear()
@@ -291,57 +300,43 @@ namespace TikTokLiveGame
             players.Clear();
             playerOrder.Clear();
             crowdSlots.Clear();
-            nextNpcRefillAt = 0f;
             EnsureNpcCrowd();
         }
 
-        private void RemoveOldest()
+        private void RemoveOldestViewer()
         {
-            KeyValuePair<string, PlayerActor> oldest = players.OrderBy(pair => pair.Value.LastActiveTime).FirstOrDefault();
+            KeyValuePair<string, PlayerActor> oldest = players.Where(pair => !pair.Value.IsNpc)
+                .OrderBy(pair => pair.Value.LastActiveTime).FirstOrDefault();
             if (!string.IsNullOrEmpty(oldest.Key)) Remove(oldest.Key);
         }
 
         private void Remove(string id)
         {
             if (!players.Remove(id, out PlayerActor actor)) return;
-            bool wasNpc = actor.IsNpc;
             playerOrder.Remove(id);
             crowdSlots.Remove(id);
             Destroy(actor.gameObject);
             ReflowPlayers();
-            if (!wasNpc) nextNpcRefillAt = Time.unscaledTime + 30f;
         }
 
         private void EnsureNpcCrowd()
         {
-            int realCount = players.Values.Count(actor => !actor.IsNpc);
-            int desiredNpcCount = Mathf.Max(0, Mathf.Min(npcCrowdTarget - realCount, maxPlayers - realCount));
-            int currentNpcCount = players.Values.Count(actor => actor.IsNpc);
-            for (int index = currentNpcCount; index < desiredNpcCount; index++)
+            HashSet<string> occupiedNames = players.Values.Where(actor => actor.IsNpc).Select(actor => actor.Nickname).ToHashSet();
+            for (int index = 0; index < NpcTarget; index++)
             {
-                int nameIndex = index % NpcNames.Length;
-                string id = $"npc-{nameIndex:000}";
+                string id = $"npc-{index:000}";
                 if (players.ContainsKey(id)) continue;
+                string name = npcNames.Next(occupiedNames);
+                occupiedNames.Add(name);
                 Create(new TikTokPlayerData
                 {
                     userId = id,
                     uniqueId = id,
-                    nickname = NpcNames[nameIndex],
+                    nickname = name,
                     avatar = string.Empty,
                     giftPower = 0
                 });
             }
-            nextNpcRefillAt = float.PositiveInfinity;
-        }
-
-        private void RemoveOneNpc()
-        {
-            string npcId = playerOrder.LastOrDefault(id => players.TryGetValue(id, out PlayerActor actor) && actor.IsNpc);
-            if (string.IsNullOrEmpty(npcId)) return;
-            players.Remove(npcId, out PlayerActor actorToRemove);
-            playerOrder.Remove(npcId);
-            crowdSlots.Remove(npcId);
-            if (actorToRemove != null) Destroy(actorToRemove.gameObject);
         }
 
         private static string Normalize(string value)

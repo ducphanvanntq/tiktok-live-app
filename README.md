@@ -19,6 +19,7 @@
 ## ✨ Tính năng
 
 - 🕺 **Sàn nhảy 3D realtime** — Người xem TikTok tham gia sàn nhảy với nhân vật 3D
+- 👥 **20 NPC thường trực** — Chọn ngẫu nhiên từ 1.520 tên, không trùng trong cùng nhóm; vẫn ở lại khi người thật tham gia. Sàn hỗ trợ thêm tối đa 400 người thật.
 - 🎁 **Gift → Hiệu ứng** — Mỗi gift kích hoạt hiệu ứng riêng (zoom camera, pháo hoa, VIP spotlight...)
 - 🏆 **Bảng xếp hạng Top 3** — Top gifter đứng trên bục DJ
 - 🎵 **DJ Booth** — Phát nhạc + video nền tùy chỉnh

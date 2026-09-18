@@ -7,7 +7,9 @@ ONG CHU MMO LIVE - HUONG DAN SU DUNG
 
 KET NOI LIVE THAT
 
-Nguoi xem gui chat, like, follow, share hoac gift se thay NPC tren san.
+San co san 20 NPC voi ten ngau nhien tu 1.520 ten, khong trung trong cung nhom.
+Nguoi xem tham gia se dung cung NPC; NPC khong bi xoa de nhuong cho cho nguoi that.
+Gioi han 400 nguoi that duoc tinh rieng, ngoai 20 NPC. Reconnect giu nguyen NPC; RESET tao nhom ten moi.
 Ten va avatar TikTok duoc cap nhat tu dong; neu TikTok chua tra anh, game dung avatar du phong de khong bi o den.
 Neu Node hoac duong truyen bi mat tam thoi, game va cau noi TikTok se tu ket noi lai.
 Khong can dong game khi bi rot mang ngan han.
