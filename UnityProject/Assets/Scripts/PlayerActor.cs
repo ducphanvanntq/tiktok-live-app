@@ -70,6 +70,46 @@ namespace TikTokLiveGame
             return false;
         }
         public bool IsNpc => !string.IsNullOrEmpty(UserId) && UserId.StartsWith("npc-");
+        internal bool TryGetChatAnchor(Camera camera, out Vector2 anchor, out float alpha)
+        {
+            anchor = default;
+            alpha = visualAlpha;
+            if (camera == null || characterRenderer == null || !characterRenderer.enabled ||
+                !gameObject.activeInHierarchy || alpha < 0.3f) return false;
+            Bounds bounds = characterRenderer.bounds;
+            Vector3 center = camera.WorldToScreenPoint(bounds.center);
+            if (center.z <= camera.nearClipPlane || center.x < 0f || center.x > Screen.width ||
+                center.y < 0f || center.y > Screen.height) return false;
+            float top = ProjectedTop(camera, bounds);
+            // Keep the chat above visible name/avatar/rank badges, including grows and jumps.
+            RaiseAbove(nameLabel, camera, ref top);
+            RaiseAbove(rankLabel, camera, ref top);
+            if (avatarRenderer != null && avatarRenderer.enabled && avatarRenderer.color.a > 0.3f)
+                top = Mathf.Max(top, ProjectedTop(camera, avatarRenderer.bounds));
+            anchor = new Vector2(center.x, Screen.height - top);
+            return float.IsFinite(anchor.x) && float.IsFinite(anchor.y);
+        }
+
+        private static void RaiseAbove(TextMesh label, Camera camera, ref float top)
+        {
+            if (label == null || !label.gameObject.activeInHierarchy) return;
+            Renderer renderer = label.GetComponent<Renderer>();
+            if (renderer != null && renderer.enabled) top = Mathf.Max(top, ProjectedTop(camera, renderer.bounds));
+        }
+
+        private static float ProjectedTop(Camera camera, Bounds bounds)
+        {
+            float top = float.MinValue;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 point = bounds.center + Vector3.Scale(bounds.extents,
+                    new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+                Vector3 projected = camera.WorldToScreenPoint(point);
+                if (projected.z <= camera.nearClipPlane) return float.PositiveInfinity;
+                top = Mathf.Max(top, projected.y);
+            }
+            return top;
+        }
         private bool UsesSyntheticAvatar => !string.IsNullOrEmpty(UserId) &&
             (UserId.StartsWith("npc-") || UserId.StartsWith("demo-") || UserId == "master-test");
 
@@ -456,11 +496,6 @@ namespace TikTokLiveGame
             effectScale = 1.85f;
             growUntil = Time.time + Mathf.Max(2f, seconds);
             Celebrate(seconds);
-        }
-
-        public void SetDimmed(bool dimmed)
-        {
-            targetAlpha = dimmed ? 0.1f : 1f;
         }
 
         public void SetVisibility(float alpha)

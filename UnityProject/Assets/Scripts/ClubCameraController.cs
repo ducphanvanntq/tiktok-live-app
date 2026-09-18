@@ -35,7 +35,7 @@ namespace TikTokLiveGame
 
         public void Focus(PlayerActor actor, float seconds, bool vip, bool wide = false)
         {
-            if (actor == null) return;
+            if (actor == null || actor.IsNpc) return;
             focusTarget = actor.transform;
             focusUntil = Time.time + Mathf.Clamp(seconds, 2f, 12f);
             focusVip = vip;
@@ -48,7 +48,7 @@ namespace TikTokLiveGame
 
         public void FocusFireworks(PlayerActor actor, float seconds = 6f)
         {
-            if (actor == null) return;
+            if (actor == null || actor.IsNpc) return;
             focusTarget = actor.transform;
             focusDuration = Mathf.Clamp(seconds, 5.5f, 8f);
             focusStartedAt = Time.time;
@@ -61,7 +61,7 @@ namespace TikTokLiveGame
 
         public void QueueWelcome(PlayerActor actor, float seconds = 2f)
         {
-            if (actor == null) return;
+            if (actor == null || actor.IsNpc) return;
             WelcomeRequest request = new(actor, Mathf.Clamp(seconds, 2f, 3f));
             if (Time.time >= focusUntil && welcomeQueue.Count == 0 && !welcomeOverflow)
             {
@@ -74,7 +74,7 @@ namespace TikTokLiveGame
 
         private void StartWelcome(WelcomeRequest request)
         {
-            if (request.Actor == null) return;
+            if (request.Actor == null || request.Actor.IsNpc) return;
             focusTarget = request.Actor.transform;
             focusDuration = request.Seconds;
             focusStartedAt = Time.time;
@@ -87,6 +87,7 @@ namespace TikTokLiveGame
 
         private void StartCrowdWelcome()
         {
+            if (!TryGetViewerBounds(out _)) return;
             focusTarget = null;
             focusDuration = 2.5f;
             focusStartedAt = Time.time;
@@ -103,7 +104,7 @@ namespace TikTokLiveGame
             while (welcomeQueue.Count > 0)
             {
                 WelcomeRequest request = welcomeQueue.Dequeue();
-                if (request.Actor == null) continue;
+                if (request.Actor == null || request.Actor.IsNpc) continue;
                 StartWelcome(request);
                 return;
             }
@@ -127,13 +128,17 @@ namespace TikTokLiveGame
                 wasFocusing = true;
                 if (focusCrowdWelcome)
                 {
-                    Bounds crowdBounds = new(new Vector3(0f, 0f, 0f), new Vector3(11.5f, 0f, 7.4f));
-                    if (playerManager == null) playerManager = FindFirstObjectByType<PlayerManager>();
-                    if (playerManager != null && playerManager.TryGetCrowdBounds(out Bounds liveCrowdBounds))
-                        crowdBounds = liveCrowdBounds;
-                    desiredPosition = new Vector3(crowdBounds.center.x, 10.5f, crowdBounds.max.z + 13.5f);
-                    desiredLookAt = crowdBounds.center + Vector3.up * 1.1f;
-                    desiredFov = 50f;
+                    if (TryGetViewerBounds(out Bounds crowdBounds))
+                    {
+                        desiredPosition = new Vector3(crowdBounds.center.x, 10.5f, crowdBounds.max.z + 13.5f);
+                        desiredLookAt = crowdBounds.center + Vector3.up * 1.1f;
+                        desiredFov = 50f;
+                    }
+                    else
+                    {
+                        focusCrowdWelcome = false;
+                        focusUntil = 0f;
+                    }
                 }
                 else
                 {
@@ -181,25 +186,30 @@ namespace TikTokLiveGame
                     wasFocusing = false;
                 }
 
-                float shotBeats = DirectorShotBars(directorShot) * 4f;
-                while (beat - directorShotStartBeat >= shotBeats)
+                if (TryGetViewerBounds(out Bounds viewerBounds))
                 {
-                    directorShotStartBeat += shotBeats;
-                    directorShot++;
-                    if (directorShot >= 8)
+                    float shotBeats = DirectorShotBars(directorShot) * 4f;
+                    while (beat - directorShotStartBeat >= shotBeats)
                     {
-                        directorShot = 0;
-                        directorCycle++;
+                        directorShotStartBeat += shotBeats;
+                        directorShot++;
+                        if (directorShot >= 8)
+                        {
+                            directorShot = 0;
+                            directorCycle++;
+                        }
+                        shotBeats = DirectorShotBars(directorShot) * 4f;
                     }
-                    shotBeats = DirectorShotBars(directorShot) * 4f;
-                }
 
-                float progress = Mathf.Clamp01((beat - directorShotStartBeat) / Mathf.Max(1f, shotBeats));
-                if (playerManager == null) playerManager = FindFirstObjectByType<PlayerManager>();
-                Bounds crowdBounds = new(new Vector3(0f, 0f, -0.25f), new Vector3(7f, 0f, 7.4f));
-                if (playerManager != null && playerManager.TryGetCrowdBounds(out Bounds liveCrowdBounds))
-                    crowdBounds = liveCrowdBounds;
-                ConfigureDirectorShot(directorShot, directorCycle, progress, crowdBounds, ref desiredPosition, ref desiredLookAt, ref desiredFov);
+                    float progress = Mathf.Clamp01((beat - directorShotStartBeat) / Mathf.Max(1f, shotBeats));
+                    ConfigureDirectorShot(directorShot, directorCycle, progress, viewerBounds, ref desiredPosition, ref desiredLookAt, ref desiredFov);
+                }
+                else
+                {
+                    // NPCs keep dancing in the wide view without attracting a scan.
+                    directorShot = 0;
+                    directorShotStartBeat = beat;
+                }
 
                 // No handheld shake in comfort mode. The dancers and lights
                 // already provide enough motion for a lively frame.
@@ -213,6 +223,13 @@ namespace TikTokLiveGame
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, blend);
             Camera camera = GetComponent<Camera>();
             camera.fieldOfView = Mathf.Lerp(camera.fieldOfView, desiredFov, blend);
+        }
+
+        private bool TryGetViewerBounds(out Bounds bounds)
+        {
+            if (playerManager == null) playerManager = FindFirstObjectByType<PlayerManager>();
+            bounds = default;
+            return playerManager != null && playerManager.TryGetViewerBounds(out bounds);
         }
 
         private static float DirectorShotBars(int shot)
@@ -248,7 +265,8 @@ namespace TikTokLiveGame
             float t = Smooth(progress);
             float side = cycle % 2 == 0 ? -1f : 1f;
             float centerX = crowd.center.x;
-            float halfWidth = Mathf.Max(2.6f, crowd.extents.x + 0.45f);
+            // A sparse real audience must not inherit the old NPC floor sweep.
+            float halfWidth = crowd.extents.x + 0.45f;
             float left = centerX - halfWidth;
             float right = centerX + halfWidth;
             float front = crowd.max.z;
@@ -262,9 +280,9 @@ namespace TikTokLiveGame
             float cameraFront = front + 9.5f;
             switch (shot)
             {
-                case 0: // Establish the entire dance floor before scanning rows.
-                    position = Vector3.Lerp(new Vector3(0f, 9.4f, cameraFront + 2.2f), new Vector3(0f, 8.7f, cameraFront + 1.2f), t);
-                    lookAt = new Vector3(0f, 0.95f, middle - 0.25f);
+                case 0: // Establish the real audience before scanning its rows.
+                    position = Vector3.Lerp(new Vector3(centerX, 9.4f, cameraFront + 2.2f), new Vector3(centerX, 8.7f, cameraFront + 1.2f), t);
+                    lookAt = new Vector3(centerX, 0.95f, middle - 0.25f);
                     fov = Mathf.Lerp(54f, 50f, t);
                     break;
                 case 1: // Sweep every dancer across the front rows.
@@ -285,13 +303,15 @@ namespace TikTokLiveGame
                 case 4: // Track across the fixed Top 1-2-3 lineup, not the DJ.
                     if (back < -5f)
                     {
+                        // Floor viewers must not pull this shot away from the podium.
+                        float podiumCenterX = front < -5f ? centerX : 0f;
                         position = Vector3.Lerp(
-                            new Vector3(-side * 2.4f, 4.85f, 6.15f),
-                            new Vector3(side * 2.4f, 4.55f, 5.25f),
+                            new Vector3(podiumCenterX - side * 2.4f, 4.85f, 7.65f),
+                            new Vector3(podiumCenterX + side * 2.4f, 4.55f, 6.75f),
                             t
                         );
-                        lookAt = new Vector3(0f, 2.05f, -6.05f);
-                        fov = Mathf.Lerp(43f, 40f, t);
+                        lookAt = new Vector3(podiumCenterX, 2.05f, -6.05f);
+                        fov = Mathf.Lerp(47f, 45f, t);
                     }
                     else
                     {
@@ -327,7 +347,7 @@ namespace TikTokLiveGame
                         new Vector3(centerX - side * (halfWidth + 0.8f), 5.15f, front + 8.4f),
                         new Vector3(centerX - side * 1.8f, 4.75f, front + 7.4f),
                         t);
-                    lookAt = new Vector3(centerX - side * Mathf.Max(1.2f, halfWidth * 0.42f), 1.3f, middle + 0.35f);
+                    lookAt = new Vector3(centerX - side * halfWidth * 0.42f, 1.3f, middle + 0.35f);
                     fov = Mathf.Lerp(46f, 42f, t);
                     break;
             }

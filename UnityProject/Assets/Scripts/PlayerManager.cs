@@ -34,9 +34,9 @@ namespace TikTokLiveGame
         internal int UniqueSlotCount => crowdSlots.Values.Distinct().Count();
         public PlayerActor Find(string userId) => !string.IsNullOrWhiteSpace(userId) && players.TryGetValue(userId, out PlayerActor actor) ? actor : null;
 
-        public bool TryGetCrowdBounds(out Bounds bounds)
+        public bool TryGetViewerBounds(out Bounds bounds)
         {
-            PlayerActor first = players.Values.FirstOrDefault(actor => actor != null);
+            PlayerActor first = players.Values.FirstOrDefault(actor => actor != null && !actor.IsNpc);
             if (first == null)
             {
                 bounds = new Bounds(Vector3.zero, Vector3.zero);
@@ -45,7 +45,7 @@ namespace TikTokLiveGame
 
             bounds = new Bounds(first.transform.position, Vector3.zero);
             foreach (PlayerActor actor in players.Values)
-                if (actor != null) bounds.Encapsulate(actor.transform.position);
+                if (actor != null && !actor.IsNpc) bounds.Encapsulate(actor.transform.position);
             return true;
         }
 
@@ -58,6 +58,8 @@ namespace TikTokLiveGame
 
         public void FocusPlayer(string userId, float seconds)
         {
+            PlayerActor target = Find(userId);
+            if (target == null || target.IsNpc) return;
             int version = ++focusVersion;
             focusedUserId = userId;
             foreach (KeyValuePair<string, PlayerActor> pair in players)

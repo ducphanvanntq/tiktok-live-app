@@ -36,6 +36,12 @@ namespace TikTokLiveGame
         {
             if (welcomeDirectory != null)
             {
+                if (Array.IndexOf(Environment.GetCommandLineArgs(), "-chatBubblePreview") >= 0)
+                {
+                    ChatBubbleCaptureHarness chatPreview = root.AddComponent<ChatBubbleCaptureHarness>();
+                    chatPreview.StartCoroutine(chatPreview.Capture(welcomeDirectory));
+                    return;
+                }
                 if (Array.IndexOf(Environment.GetCommandLineArgs(), "-topPointsPreview") >= 0)
                 {
                     TopPointsCaptureHarness pointsPreview = root.AddComponent<TopPointsCaptureHarness>();

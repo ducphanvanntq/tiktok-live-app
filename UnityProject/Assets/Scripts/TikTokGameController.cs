@@ -14,6 +14,7 @@ namespace TikTokLiveGame
 
         private WelcomeToast welcomeToast;
         private TopPointsPanel topPoints;
+        private ViewerChatBubbles chatBubbles;
         private readonly PointsLeaderboard points = new();
         internal TopPointsPanel PointsPanel => topPoints;
         internal PointScoreData[] PointScores => points.Top;
@@ -47,6 +48,7 @@ namespace TikTokLiveGame
         {
             welcomeToast = gameObject.AddComponent<WelcomeToast>();
             topPoints = gameObject.AddComponent<TopPointsPanel>();
+            chatBubbles = gameObject.AddComponent<ViewerChatBubbles>();
             client = socketClient;
             playerManager = manager;
             giftEffects = effects;
@@ -109,6 +111,7 @@ namespace TikTokLiveGame
             }
 
             playerManager.Handle(liveEvent);
+            chatBubbles.Handle(liveEvent, playerManager, Time.unscaledTime);
             welcomeToast.Handle(liveEvent, playerManager);
             if (points.Apply(liveEvent)) topPoints.SetScores(points.Top, liveEvent.type == "reset");
             if (liveEvent.type is "gift" or "like" or "snapshot" or "member" or "chat" or "follow" or "share" or "reset") UpdateTopPlayers();
@@ -124,7 +127,7 @@ namespace TikTokLiveGame
             if (requestsFocus && (liveEvent.type is "gift" or "chat" or "follow" or "share"))
             {
                 PlayerActor actor = playerManager.Find(liveEvent.userId);
-                if (actor == null) return;
+                if (actor == null || actor.IsNpc) return;
                 float focusSeconds = liveEvent.durationMs > 0 ? liveEvent.durationMs / 1000f : (socialFocus ? 2f : joinFocus ? 2.5f : 3f);
                 bool wideWalkFocus = liveEvent.action == "walk";
                 if (joinFocus || socialFocus)
@@ -205,6 +208,8 @@ namespace TikTokLiveGame
             bool bannerActive = giftEffects != null && Time.unscaledTime < giftEffects.BannerUntil;
             topPoints.Draw(playerManager, hudVisible,
                 controlsVisible || welcomeToast.ActiveUserId != null || bannerActive);
+
+            chatBubbles.Draw(Camera.main, topPoints.Opacity > 0f ? topPoints.GetPixelRect() : default, controlsVisible);
 
             GUI.matrix = originalMatrix;
         }

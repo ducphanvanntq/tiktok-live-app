@@ -117,7 +117,7 @@ namespace TikTokLiveGame
 
             // All director shots at start/mid/end, while the crowd animates.
             MethodInfo configure=typeof(ClubCameraController).GetMethod("ConfigureDirectorShot",BindingFlags.NonPublic|BindingFlags.Static);
-            manager.TryGetCrowdBounds(out Bounds crowd);
+            manager.TryGetViewerBounds(out Bounds crowd);
             for(int shot=0;shot<8;shot++) for(int step=0;step<3;step++)
             {
                 object[] args={shot,0,step*0.5f,crowd,Vector3.zero,Vector3.zero,45f};

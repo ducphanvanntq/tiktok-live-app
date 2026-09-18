@@ -6,6 +6,18 @@ on viewer joins, capacity eviction, viewer expiry and reconnect snapshots, and
 creates a fresh crowd on explicit reset. Incoming events cannot create or rename
 NPC identities. NPCs remain excluded from welcome cards and top donor ranks.
 
+Camera focus (including VIP, fireworks and welcome shots) rejects NPCs. Automatic
+shots and group welcomes frame only real viewers; when only NPCs remain, the
+camera holds a wide room view. NPCs may still appear as background dancers.
+
+Run the camera regression checks in Unity Edit Mode with
+`-batchmode -quit -projectPath UnityProject -executeMethod TikTokLiveGame.Editor.CameraFocusChecks.Run`.
+The log must contain `CAMERA_FOCUS_CHECKS_OK`. Checks also project a lone viewer's
+feet, shoulders and name/rank area into the portrait viewport across all eight
+shots, both sweep directions, floor corners and podium positions. These checks
+also cover podium viewers with another viewer at each floor corner. They do not
+connect to the live backend or open a game window.
+
 `NpcNamePool` shuffles 1,520 names (80 nicknames and 24 family names × 60 given
 names). It exhausts the deck before reshuffling and skips names already occupied
 by another NPC. Names stay fixed for each NPC's lifetime. Character art and floor
