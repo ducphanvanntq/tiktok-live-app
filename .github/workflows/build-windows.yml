@@ -45,7 +45,11 @@ jobs:
             Library-
 
       - name: Build player
-        uses: game-ci/unity-builder@v4
+        # v4 hard-fails without UNITY_LICENSE or UNITY_SERIAL. Unity dropped
+        # manual .ulf activation for Personal seats, so there is no license file
+        # to supply; v6 wraps game-ci/cli, which acquires a Personal seat from
+        # the licensing service using UNITY_EMAIL/UNITY_PASSWORD instead.
+        uses: game-ci/unity-builder@v6
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
