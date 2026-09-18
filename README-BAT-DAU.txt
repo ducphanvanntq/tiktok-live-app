@@ -1,4 +1,4 @@
-ONG CHU MMO LIVE - FULL SOURCE, GIAY PHEP MIT
+WANGNGUEN-BRIGDE LIVE - FULL SOURCE, GIAY PHEP MIT
 
 Noi dung goi:
 - UnityProject: toan bo source Unity, scene, script va asset cua game.
@@ -13,7 +13,7 @@ Yeu cau:
 - Unity 6000.2.10f1 chi can khi tu build source.
 
 Chay nhanh tren Windows:
-1. Tai file OngChuMMO-Live-Windows-v1.0.5.zip trong muc Releases cua GitHub.
+1. Tai file WangnguenBrigde-Live-Windows-v1.0.5.zip trong muc Releases cua GitHub.
 2. Giai nen toan bo ZIP ra thu muc moi. Khong chay truc tiep ben trong ZIP.
 3. Cai Node.js 20 tro len, sau do nhan dup run.bat.
 4. Neu cong 3000 dang bi chiem, dong dung chuong trinh duoc bao roi chay lai.
@@ -49,6 +49,5 @@ Luu y:
 - Xem file LICENSE de biet chi tiet giay phep MIT.
 
 Lien he:
-- Website : https://ongchummo.com
-- Zalo    : 0977.896.644
-- Email   : toanhvan90@gmail.com
+- Ma nguon: https://github.com/ducphanvanntq/tiktok-live-app
+- Email   : wangnguenlc79@gmail.com

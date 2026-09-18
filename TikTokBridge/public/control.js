@@ -1,7 +1,7 @@
 /* ─────────────────────────────────────────────────────────
-   ÔNG CHÚ MMO — Control Panel JS
-   © 2025 ÔNG CHÚ MMO — ongchummo.com
-   Zalo: 0977.896.644 | Website: https://ongchummo.com
+   wangnguen-brigde — Control Panel JS
+   © 2025 wangnguen-brigde — github.com/ducphanvanntq/tiktok-live-app
+   Nguồn: https://github.com/ducphanvanntq/tiktok-live-app
 ───────────────────────────────────────────────────────── */
 
 /* ═══ TAB NAVIGATION ════════════════════════════════════ */

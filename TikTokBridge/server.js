@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════
-   ÔNG CHÚ MMO — TikTok Live Bridge Server
-   © 2025 ÔNG CHÚ MMO — ongchummo.com
+   wangnguen-brigde — TikTok Live Bridge Server
+   © 2025 wangnguen-brigde — github.com/ducphanvanntq/tiktok-live-app
    Phát hành theo giấy phép MIT. Xem file ../LICENSE.
 ═══════════════════════════════════════════════════════════ */
 
@@ -133,7 +133,7 @@ app.use('/assets', express.static(assetsDir, staticOptions));
 app.use('/vendor/three', express.static(path.join(__dirname, 'node_modules', 'three', 'build'), staticOptions));
 
 app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', appId: 'ongchu-mmo-live-bridge', version: '1.0.0' });
+    res.json({ status: 'ok', appId: 'wangnguen-brigde', version: '1.0.0' });
 });
 
 app.get('/api/config', (_req, res) => {
