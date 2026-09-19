@@ -42,11 +42,20 @@ namespace TikTokLiveGame
         {
             if (videoSourceTexture != null && videoTexture != null)
             {
-                Graphics.Blit(
-                    videoSourceTexture,
-                    videoTexture,
-                    new Vector2(1f, -1f),
-                    new Vector2(0f, 1f));
+                RenderTexture previousTarget = RenderTexture.active;
+                try
+                {
+                    Graphics.Blit(
+                        videoSourceTexture,
+                        videoTexture,
+                        new Vector2(1f, -1f),
+                        new Vector2(0f, 1f));
+                }
+                finally
+                {
+                    // Keep the video target from leaking into UI rendering and screen captures.
+                    RenderTexture.active = previousTarget;
+                }
             }
             if (imagePaths.Length <= 1 || Time.unscaledTime < nextSlideAt) return;
             ShowImage((imageIndex + 1) % imagePaths.Length);
@@ -174,6 +183,7 @@ namespace TikTokLiveGame
             string[] folders =
             {
                 Path.Combine(buildRoot, "DJ_VIDEO"),
+                Path.Combine(projectRoot, "DJ_VIDEO"),
                 Path.Combine(workspaceRoot, "DJ_VIDEO"),
                 Application.streamingAssetsPath
             };
@@ -196,6 +206,7 @@ namespace TikTokLiveGame
             string[] folders =
             {
                 Path.Combine(buildRoot, "DJ_VIDEO"),
+                Path.Combine(projectRoot, "DJ_VIDEO"),
                 Path.Combine(workspaceRoot, "DJ_VIDEO"),
                 Application.streamingAssetsPath
             };

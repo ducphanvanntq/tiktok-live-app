@@ -195,6 +195,8 @@ WangnguenBrigde-Live-Windows-v<version>/
 | `F1` | Ẩn / hiện bảng điều khiển |
 | `F2` | Bật / tắt nền xanh Chroma Key |
 | `F3` | Ẩn / hiện bảng TOP điểm |
+| `F4` | Bật / tắt chế độ kéo tiêu đề để đặt vị trí bảng TOP (tự lưu) |
+| `F5` | Đưa TOP về góc dưới phải khi đang đặt vị trí bằng F4 |
 | `F11` | Toàn màn hình |
 
 ---
@@ -206,6 +208,8 @@ WangnguenBrigde-Live-Windows-v<version>/
 | `nhảy` / `dance` | Nhân vật nhảy |
 | `đi vòng` / `walk` | Nhân vật đi bước tại chỗ |
 | `đổi nv` | Đổi nhân vật ngẫu nhiên |
+
+Camera thỉnh thoảng focus bot khi sàn yên. Người xem đã vào sàn gửi chat sẽ được ưu tiên trước bot; nếu đang có hiệu ứng quà, lượt focus chat chờ hiệu ứng kết thúc. Chat liên tục từ cùng một người không tạo thêm lượt chờ.
 
 ---
 

@@ -106,6 +106,31 @@ namespace TikTokLiveGame
             if (changed) ApplyVisibilityState();
         }
 
+        internal bool TryGetCrowdBounds(out Bounds bounds)
+        {
+            bool found = false;
+            bounds = default;
+            foreach (PlayerActor actor in players.Values)
+            {
+                if (actor == null || !actor.gameObject.activeInHierarchy) continue;
+                if (!found) bounds = new Bounds(actor.transform.position, Vector3.zero);
+                else bounds.Encapsulate(actor.transform.position);
+                found = true;
+            }
+            return found;
+        }
+
+        internal PlayerActor NextNpcForCamera(ref int cursor)
+        {
+            for (int checkedCount = 0; checkedCount < playerOrder.Count; checkedCount++)
+            {
+                cursor %= playerOrder.Count;
+                PlayerActor actor = Find(playerOrder[cursor++]);
+                if (actor != null && actor.IsNpc && actor.gameObject.activeInHierarchy) return actor;
+            }
+            return null;
+        }
+
         internal bool OverlapsScreenRect(Camera camera, Rect rect)
         {
             if (camera == null) return true;

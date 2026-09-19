@@ -90,13 +90,14 @@ for entry in "$player_dir"/*; do
     esac
 done
 
-# The player looks for media in the directory holding the executable, falling
-# back two levels up so the Editor can find the repo copies. Only the first
-# path exists inside a distributed ZIP.
+# The player looks for media beside the executable, with parent-folder
+# fallbacks for local builds and the Editor. Packages include the first path.
 #   DJ_MUSIC -> MusicPlaylistPlayer.cs:163 (VOLUME.txt at :188)
 #   DJ_VIDEO -> DjVideoScreen.cs:176, ClubBeatClock.cs:33 (BPM.txt)
 cp -r "$REPO_ROOT/DJ_MUSIC" "$stage/Build/"
 cp -r "$REPO_ROOT/DJ_VIDEO" "$stage/Build/"
+mkdir -p "$stage/Build/LiveAssets"
+cp -r "$REPO_ROOT/LiveAssets/DJ_GIF" "$stage/Build/LiveAssets/"
 
 # The server resolves config/, public/ and assets/ against its working
 # directory (config.rs:155 app_root), which run.bat sets to this folder.

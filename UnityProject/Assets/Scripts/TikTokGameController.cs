@@ -62,6 +62,12 @@ namespace TikTokLiveGame
             if (Input.GetKeyDown(KeyCode.F1)) controlsVisible = !controlsVisible;
             if (Input.GetKeyDown(KeyCode.F2)) ToggleChroma();
             if (Input.GetKeyDown(KeyCode.F3)) hudVisible = !hudVisible;
+            if (Input.GetKeyDown(KeyCode.F4))
+            {
+                topPoints.TogglePositioning();
+                if (topPoints.IsPositioning) controlsVisible = false;
+            }
+            if (Input.GetKeyDown(KeyCode.F5) && topPoints.IsPositioning) topPoints.ResetPosition();
             if (Input.GetKeyDown(KeyCode.F11)) Screen.fullScreen = !Screen.fullScreen;
             for (int index = feed.Count - 1; index >= 0; index--)
                 if (Time.unscaledTime - feed[index].Time > 9f) feed.RemoveAt(index);
@@ -123,14 +129,17 @@ namespace TikTokLiveGame
 
             bool joinFocus = liveEvent.action == "join" && liveEvent.joinedNow;
             bool socialFocus = liveEvent.type is "follow" or "share";
-            bool requestsFocus = joinFocus || socialFocus || liveEvent.action is "camera" or "walk" or "vip" or "topdj" or "fireworks" or "medal";
+            bool actionFocus = liveEvent.action is "camera" or "walk" or "vip" or "topdj" or "fireworks" or "medal";
+            bool chatFocus = liveEvent.type == "chat" && !joinFocus && !actionFocus && ChatBubbleText.Clean(liveEvent.comment).Length > 0;
+            bool requestsFocus = joinFocus || socialFocus || actionFocus || chatFocus;
             if (requestsFocus && (liveEvent.type is "gift" or "chat" or "follow" or "share"))
             {
                 PlayerActor actor = playerManager.Find(liveEvent.userId);
                 if (actor == null || actor.IsNpc) return;
+                if (chatFocus && !ViewerChatBubbles.IsRealViewer(actor)) return;
                 float focusSeconds = liveEvent.durationMs > 0 ? liveEvent.durationMs / 1000f : (socialFocus ? 2f : joinFocus ? 2.5f : 3f);
                 bool wideWalkFocus = liveEvent.action == "walk";
-                if (joinFocus || socialFocus)
+                if (joinFocus || socialFocus || chatFocus)
                 {
                     clubCamera?.QueueWelcome(actor, focusSeconds);
                 }
@@ -142,9 +151,9 @@ namespace TikTokLiveGame
                         focusSeconds,
                         liveEvent.action is "vip" or "topdj" || liveEvent.diamondCount >= 100,
                         wideWalkFocus);
-                // A first-time "hey" is a clean welcome shot. Gift focuses keep
+                // Chats and welcomes use a clean shot. Gift focuses keep
                 // the crowd dimming and VIP decoration handled by PlayerManager.
-                if (!joinFocus && !socialFocus)
+                if (!joinFocus && !socialFocus && !chatFocus)
                 {
                     playerManager.FocusPlayer(liveEvent.userId, focusSeconds);
                     StartCoroutine(CinematicGift(focusSeconds));
@@ -303,13 +312,21 @@ namespace TikTokLiveGame
         {
             float y = height - 34f - feed.Count * 27f;
             float scale = Mathf.Clamp(Mathf.Min(Screen.width / 1080f, Screen.height / 1080f), 0.72f, 1.25f);
-            float feedWidth = points.Top.Length > 0 && hudVisible
-                ? Mathf.Max(40f,topPoints.GetPixelRect().x/scale-38f) : 520f;
+            Rect card = topPoints.GetPixelRect();
+            card = new Rect(card.position / scale, card.size / scale);
+            bool reserveTop = points.Top.Length > 0 && hudVisible || topPoints.IsPositioning;
             foreach (FeedEntry item in feed)
             {
                 Color old = GUI.color;
                 GUI.color = item.Color;
-                GUI.Label(new Rect(24, y, Mathf.Min(520f,feedWidth), 25), item.Text, smallStyle);
+                float left = 24f, right = Screen.width / scale - 24f;
+                if (reserveTop && y < card.yMax + 12f && y + 25f > card.yMin - 12f)
+                {
+                    if (card.xMin - left > right - card.xMax) right = Mathf.Min(right, card.xMin - 14f);
+                    else left = Mathf.Max(left, card.xMax + 14f);
+                }
+                if (right - left >= 40f)
+                    GUI.Label(new Rect(left, y, Mathf.Min(520f, right - left), 25), item.Text, smallStyle);
                 GUI.color = old;
                 y += 27f;
             }

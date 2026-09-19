@@ -20,6 +20,7 @@ namespace TikTokLiveGame
         private void Start()
         {
             targetRenderer = GetComponent<Renderer>();
+            targetRenderer.enabled = false;
             
             // Cài đặt material hỗ trợ trong suốt (Transparent Unlit)
             Shader transparentShader = Shader.Find("Unlit/Transparent");
@@ -58,6 +59,15 @@ namespace TikTokLiveGame
                 tex.LoadImage(fileData);
                 tex.Apply(false, true); // Update CPU side, make it non-readable to save memory
                 frames[i] = tex;
+
+                if (i == 0)
+                {
+                    Vector3 scale = transform.localScale;
+                    scale.x = scale.y * tex.width / tex.height;
+                    transform.localScale = scale;
+                    targetRenderer.sharedMaterial.mainTexture = tex;
+                    targetRenderer.enabled = true;
+                }
 
                 // Yield to prevent freezing the main thread if there are many frames
                 if (i % 20 == 0) yield return null;

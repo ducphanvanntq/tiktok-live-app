@@ -17,6 +17,7 @@ on:
       - 'TikTokBridge/assets/**'
       - 'DJ_MUSIC/**'
       - 'DJ_VIDEO/**'
+      - 'LiveAssets/DJ_GIF/**'
       - 'run.command'
       - 'scripts/package-macos.sh'
       - '.github/workflows/build-macos.yml'

@@ -21,7 +21,10 @@ namespace TikTokLiveGame.Editor
                 var players = Read<Dictionary<string, PlayerActor>>(manager, "players");
                 PlayerActor bot = Actor(root, "npc-000", new Vector3(-1000f, 0f, 1000f));
                 players.Add(bot.UserId, bot);
-                Require(!manager.TryGetViewerBounds(out _), "A bot-only room has no camera subjects");
+                Read<List<string>>(manager, "playerOrder").Add(bot.UserId);
+                Require(!manager.TryGetViewerBounds(out _), "A bot-only room has no real-viewer welcome subjects");
+                Require(TryGetCrowdBounds(manager, out Bounds botBounds) && botBounds.center == bot.transform.position,
+                    "Ambient framing includes active bots");
 
                 GameObject cameraObject = new("Test camera");
                 cameraObject.transform.SetParent(root.transform);
@@ -35,62 +38,88 @@ namespace TikTokLiveGame.Editor
                 Write(director, "playerManager", manager);
                 Write(director, "currentLookAt", new Vector3(0f, 1.25f, -1.2f));
 
-                RejectBotRequests(director, bot);
-                Require(Read<Transform>(director, "focusTarget") == null, "NPCs cannot start a close-up");
+                director.FocusFireworks(bot);
+                for (int i = 0; i < 8; i++) director.QueueWelcome(bot);
+                Require(Read<Transform>(director, "focusTarget") == null, "NPCs cannot start a fireworks or welcome shot");
                 Require(Read<ICollection>(director, "welcomeQueue").Count == 0, "NPCs cannot fill the welcome queue");
                 Require(!Read<bool>(director, "welcomeOverflow"), "NPCs cannot trigger a crowd welcome");
                 manager.FocusPlayer(bot.UserId, 5f);
                 manager.FocusPlayer("missing-viewer", 5f);
                 Require(Read<string>(manager, "focusedUserId") == null, "Invalid focus cannot dim the crowd around a bot");
-                Write(director, "directorShot", 5);
-                Write(director, "directorCycle", 2);
-                Write(director, "directorShotStartBeat", -100f);
+                Write(director, "nextNpcFocusAt", -1f);
                 Tick(director);
-                Require(Read<int>(director, "directorShot") == 0 && Read<int>(director, "directorCycle") == 2,
-                    "Without viewers, the camera stops cycling through NPC rows");
+                Require(Read<Transform>(director, "focusTarget") == bot.transform && Read<bool>(director, "focusNpc"),
+                    "An idle room automatically focuses a bot");
 
                 PlayerActor first = Actor(root, "viewer-a", new Vector3(8f, 0f, -1f));
                 PlayerActor second = Actor(root, "viewer-b", new Vector3(11f, 0f, 3f));
                 players.Add(first.UserId, first);
                 players.Add(second.UserId, second);
                 Require(manager.TryGetViewerBounds(out Bounds bounds) && bounds.min == first.transform.position && bounds.max == second.transform.position,
-                    "Mixed-room framing includes only real viewers");
+                    "Group welcomes frame only real viewers");
                 bot.transform.position = new Vector3(2000f, 500f, -2000f);
                 Require(manager.TryGetViewerBounds(out Bounds movedBounds) && movedBounds == bounds,
-                    "A moving or jumping bot cannot move the camera's framing bounds");
+                    "A moving bot cannot move the group welcome's bounds");
+                Require(TryGetCrowdBounds(manager, out Bounds crowdBounds) && crowdBounds.Contains(bot.transform.position),
+                    "Ambient shots still include the moving bot");
+
+                director.QueueWelcome(first);
+                Require(Read<Transform>(director, "focusTarget") == first.transform && !Read<bool>(director, "focusNpc"),
+                    "A real chat or welcome interrupts bot focus immediately");
+                for (int i = 0; i < 100; i++)
+                {
+                    director.QueueWelcome(first);
+                    director.QueueWelcome(second);
+                }
+                Require(Read<ICollection>(director, "welcomeQueue").Count == 1 && !Read<bool>(director, "welcomeOverflow"),
+                    "Repeated chats do not duplicate the active or queued viewer");
+                ExpireAndTick(director);
+                Require(Read<Transform>(director, "focusTarget") == second.transform,
+                    "The next real viewer gets a turn before a bot");
 
                 director.Focus(first, 5f, true);
                 float until = Read<float>(director, "focusUntil");
-                RejectBotRequests(director, bot);
+                RequestBotFocusAndWelcomes(director, bot);
                 Require(Read<Transform>(director, "focusTarget") == first.transform && Read<float>(director, "focusUntil") == until,
                     "NPC requests cannot interrupt a real viewer's VIP focus");
                 director.FocusFireworks(second);
                 Require(Read<Transform>(director, "focusTarget") == second.transform && Read<bool>(director, "focusFireworks"),
                     "Real viewers still receive fireworks focus");
-                RejectBotRequests(director, bot);
+                RequestBotFocusAndWelcomes(director, bot);
                 Require(Read<Transform>(director, "focusTarget") == second.transform && Read<bool>(director, "focusFireworks"),
                     "NPC requests cannot replace a real fireworks shot");
                 director.QueueWelcome(first);
-                RejectBotRequests(director, bot);
+                RequestBotFocusAndWelcomes(director, bot);
                 Require(Read<ICollection>(director, "welcomeQueue").Count == 1 && !Read<bool>(director, "welcomeOverflow"),
                     "Only the real welcome remains queued after a burst of NPC requests");
                 ExpireAndTick(director);
                 Require(Read<Transform>(director, "focusTarget") == first.transform && !Read<bool>(director, "focusFireworks"),
                     "The next real viewer's welcome still plays");
 
-                for (int i = 0; i < 5; i++) director.QueueWelcome(second);
-                Require(Read<bool>(director, "welcomeOverflow"), "Real viewer bursts still request the group shot");
+                for (int i = 0; i < 5; i++)
+                {
+                    PlayerActor viewer = Actor(root, "burst-viewer-" + i, new Vector3(i, 0f, 0f));
+                    players.Add(viewer.UserId, viewer);
+                    director.QueueWelcome(viewer);
+                }
+                Require(Read<bool>(director, "welcomeOverflow"), "Distinct viewer bursts still request the group shot");
                 for (int i = 0; i < 4; i++) ExpireAndTick(director);
                 Require(Read<bool>(director, "focusCrowdWelcome"), "A real viewer burst receives its group welcome");
-                players.Remove(first.UserId);
-                players.Remove(second.UserId);
+                foreach (string id in new List<string>(players.Keys))
+                    if (!players[id].IsNpc) players.Remove(id);
                 Tick(director);
                 Require(!Read<bool>(director, "focusCrowdWelcome"), "A group welcome stops if only bots remain");
+                Write(director, "nextNpcFocusAt", -1f);
                 Tick(director);
-                Require(Read<int>(director, "directorShot") == 0 && !manager.TryGetViewerBounds(out _),
-                    "After viewers leave, the camera returns to the wide room view");
+                Require(Read<Transform>(director, "focusTarget") == bot.transform && Read<bool>(director, "focusNpc"),
+                    "Bot focus resumes after viewers leave");
+                players.Clear();
+                Read<List<string>>(manager, "playerOrder").Clear();
+                ExpireAndTick(director);
+                Require(Read<int>(director, "directorShot") == 0 && !TryGetCrowdBounds(manager, out _),
+                    "An empty floor returns to the establishing shot");
 
-                Debug.Log("CAMERA_FOCUS_CHECKS_OK: NPC focus/queue/overflow rejected; viewer-only framing; real VIP/fireworks/welcome preserved; NPC-only room stays wide; sparse audience visible across all eight portrait camera shots.");
+                Debug.Log("CAMERA_FOCUS_CHECKS_OK: idle NPC focus; immediate real-viewer priority; duplicate suppression; gift priority; distinct-viewer overflow; NPC resumption; viewer-only welcomes; sparse audience visible across all eight portrait camera shots.");
             }
             finally { UnityEngine.Object.DestroyImmediate(root); }
         }
@@ -107,7 +136,7 @@ namespace TikTokLiveGame.Editor
             return actor;
         }
 
-        private static void RejectBotRequests(ClubCameraController director, PlayerActor bot)
+        private static void RequestBotFocusAndWelcomes(ClubCameraController director, PlayerActor bot)
         {
             director.Focus(bot, 12f, false);
             director.Focus(bot, 12f, true, true);
@@ -160,6 +189,14 @@ namespace TikTokLiveGame.Editor
                                 $"Mixed audience podium clipped: podium={podium}, floor={floor}, cycle={cycle}, step={step}, offset={offset}, viewport={p}");
                         }
                     }
+        }
+
+        private static bool TryGetCrowdBounds(PlayerManager manager, out Bounds bounds)
+        {
+            object[] args = { default(Bounds) };
+            bool found = (bool)typeof(PlayerManager).GetMethod("TryGetCrowdBounds", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(manager, args);
+            bounds = (Bounds)args[0];
+            return found;
         }
 
         private static T Read<T>(object target, string field) => (T)target.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(target);

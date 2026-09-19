@@ -19,6 +19,7 @@ namespace TikTokLiveGame
             TikTokGameController game=GetComponent<TikTokGameController>();
             PlayerManager manager=GetComponentInChildren<PlayerManager>();
             TopPointsPanel panel=game.PointsPanel;
+            panel.ResetPosition();
             Camera camera=Camera.main;
             ClubCameraController director=camera.GetComponent<ClubCameraController>();
             director.enabled=false;
@@ -39,6 +40,29 @@ namespace TikTokLiveGame
             Require(panel.Opacity>0.95f,"The bottom-right card must be visible in a clear wide shot");
             Require(manager.Find("a").TopRank==1 && manager.Find("b").TopRank==2,"Stage rank matches point rank");
             yield return Shot(directory,"01-top3.png");
+
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-topDragManualPreview") >= 0)
+            {
+                Rect before = panel.GetPixelRect();
+                File.WriteAllText(Path.Combine(directory, "mouse-ready.txt"),
+                    $"{before.x}|{before.y}|{before.width}|{before.height}");
+                float deadline = Time.realtimeSinceStartup + 90f;
+                while (Vector2.Distance(before.position, panel.GetPixelRect().position) < 100f && Time.realtimeSinceStartup < deadline)
+                    yield return null;
+                while (panel.IsDragging && Time.realtimeSinceStartup < deadline) yield return null;
+                Require(Vector2.Distance(before.position, panel.GetPixelRect().position) >= 100f && !panel.IsDragging,
+                    "Native window mouse input must move and release the TOP card");
+                Require(panel.IsPositioning, "F4 must enable placement using real keyboard input");
+                Rect placed = panel.GetPixelRect();
+                panel.LoadPosition();
+                Require(Vector2.Distance(placed.position, panel.GetPixelRect().position) < 0.1f, "Native mouse release persists position");
+                yield return Shot(directory, "native-drag.png");
+                File.WriteAllText(Path.Combine(directory, "verification.txt"), "PASS: native F4 and mouse drag, GUI coordinate scaling, release and saved position.\n");
+                Debug.Log("TOP_NATIVE_DRAG_OK");
+                yield return new WaitForSecondsRealtime(0.5f);
+                Application.Quit();
+                yield break;
+            }
 
             // Absolute server updates also animate if the user never joined the floor.
             var changed=new[] {Person("b","Ngọc Hà",35000,4),Person("a","Minh Anh",30000,1),Person("d","Bảo Ngọc",25000,5)};
@@ -133,11 +157,64 @@ namespace TikTokLiveGame
             yield return new WaitForEndOfFrame();
             Require(panel.ActiveRows==0 && panel.Opacity==0f && game.PointScores.Length==0,"Reset leaves no rows or stale animations");
             yield return Shot(directory,"08-reset-empty.png");
+            yield return VerifyDragging(panel, camera, directory);
             File.WriteAllText(Path.Combine(directory,"verification.txt"),
-                "PASS: empty/partial positive-only TOP3; 10 used assets; point formula; tie order; absolute revisions; reconnect/reset; spectator ranks; enter/exit/reorder animation frames; interrupted transitions; long labels and totals; actor occlusion and recovery; feed coexistence; compact portrait viewport and 2x capture; all eight director shots with jumping/walking/growing actors.\n");
+                "PASS: empty/partial positive-only TOP3; 10 used assets; point formula; tie order; absolute revisions; reconnect/reset; spectator ranks; enter/exit/reorder animation frames; interrupted transitions; long labels and totals; actor occlusion and recovery; feed coexistence; compact portrait viewport and 2x capture; all eight director shots; empty-card positioning; drag/release; all four edges; saved position reload; resize; lost focus; reset position.\n");
             Debug.Log("TOP_POINTS_PREVIEW_OK");
             yield return new WaitForSecondsRealtime(1f);
             Application.Quit();
+        }
+
+        private static IEnumerator VerifyDragging(TopPointsPanel panel, Camera camera, string directory)
+        {
+            camera.transform.position = new Vector3(0f, 9.2f, 17.2f);
+            camera.transform.LookAt(new Vector3(0f, 1.25f, -1.2f));
+            camera.fieldOfView = 45f;
+            panel.TogglePositioning();
+            yield return new WaitForEndOfFrame();
+            Require(panel.Opacity == 1f && panel.ActiveRows == 0, "An empty card remains visible for positioning");
+            Rect initial = panel.GetPixelRect();
+            foreach (Vector2 corner in new[] { new Vector2(-9999, -9999), new Vector2(9999, -9999), new Vector2(-9999, 9999), new Vector2(9999, 9999) })
+            {
+                Vector2 start = panel.GetPixelRect().position + Vector2.one * 10f;
+                panel.HandlePointer(new Event { type = EventType.MouseDown, button = 0 }, start, true);
+                panel.HandlePointer(new Event { type = EventType.MouseDrag, button = 0 }, corner, true);
+                Require(panel.IsDragging, "Dragging remains active while moving beyond the viewport");
+                panel.HandlePointer(new Event { type = EventType.MouseUp, button = 0 }, corner, true);
+                Rect moved = panel.GetPixelRect();
+                Require(!panel.IsDragging && moved.xMin >= 0 && moved.yMin >= 0 && moved.xMax <= Screen.width && moved.yMax <= Screen.height,
+                    "All four drag extremes keep the full card inside the viewport");
+            }
+            Vector2 grab = panel.GetPixelRect().position + Vector2.one * 10f;
+            panel.HandlePointer(new Event { type = EventType.MouseDown, button = 0 }, grab, true);
+            Vector2 drop = new(35f, Screen.height * 0.68f);
+            panel.HandlePointer(new Event { type = EventType.MouseDrag, button = 0 }, drop, true);
+            panel.HandlePointer(new Event { type = EventType.MouseUp, button = 0 }, drop, true);
+            Rect saved = panel.GetPixelRect();
+            Require(Vector2.Distance(saved.position, initial.position) > 100f, "The card actually moves from the default corner");
+            TopPointsPanel reloaded = new GameObject("TOP position reload probe").AddComponent<TopPointsPanel>();
+            Require(Vector2.Distance(reloaded.GetPixelRect().position, saved.position) < 0.1f, "A fresh component reloads the saved position");
+            Destroy(reloaded.gameObject);
+            panel.HandlePointer(new Event { type = EventType.MouseDown, button = 0 }, saved.position + Vector2.one * 10f, false);
+            Require(!panel.IsDragging, "A hidden or blocked card cannot capture a click");
+            panel.HandlePointer(new Event { type = EventType.MouseDown, button = 0 }, saved.position + Vector2.one * 10f, true);
+            panel.SendMessage("OnApplicationFocus", false);
+            Require(!panel.IsDragging, "Losing window focus releases a drag");
+            yield return Shot(directory, "09-empty-card-positioning.png");
+            int width = Screen.width, height = Screen.height;
+            Screen.SetResolution(800, 600, false);
+            yield return new WaitForSecondsRealtime(1f);
+            Rect resized = panel.GetPixelRect();
+            Require(resized.xMin >= 0 && resized.yMin >= 0 && resized.xMax <= Screen.width && resized.yMax <= Screen.height,
+                "A portrait-to-landscape resize keeps the entire card inside the viewport");
+            Screen.SetResolution(width, height, false);
+            yield return new WaitForSecondsRealtime(1f);
+            Require(Vector2.Distance(saved.position, panel.GetPixelRect().position) < 1f, "Returning to portrait preserves the chosen relative position");
+            panel.ResetPosition();
+            Require(Vector2.Distance(initial.position, panel.GetPixelRect().position) < 1f, "Reset position restores the original bottom-right layout");
+            panel.TogglePositioning();
+            yield return new WaitForEndOfFrame();
+            Require(panel.Opacity == 0f && !panel.IsPositioning, "Finishing placement restores normal empty-card visibility");
         }
 
         private static IEnumerator Shot(string directory,string file,int superSize=1)

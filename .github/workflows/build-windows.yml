@@ -20,6 +20,7 @@ on:
       - 'TikTokBridge/assets/**'
       - 'DJ_MUSIC/**'
       - 'DJ_VIDEO/**'
+      - 'LiveAssets/DJ_GIF/**'
       - 'run.bat'
       - 'build.bat'
       - 'scripts/package-windows.sh'

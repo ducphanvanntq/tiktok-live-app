@@ -15,6 +15,11 @@ namespace TikTokLiveGame
         private bool focusWide;
         private bool focusFireworks;
         private bool focusCrowdWelcome;
+        private bool focusNpc;
+        private const float NpcFocusSeconds = 3f;
+        private const float NpcFocusGap = 8f;
+        private float nextNpcFocusAt;
+        private int npcFocusCursor;
         private float focusStartedAt;
         private float focusDuration;
         private readonly Queue<WelcomeRequest> welcomeQueue = new();
@@ -25,17 +30,21 @@ namespace TikTokLiveGame
         private float directorShotStartBeat;
         private bool wasFocusing;
         private PlayerManager playerManager;
+        private bool HasActiveFocus => Time.time < focusUntil && (focusTarget != null || focusCrowdWelcome);
 
         private void Awake()
         {
             currentLookAt = defaultLookAt;
             directorShotStartBeat = ClubBeatClock.Beat;
             playerManager = FindFirstObjectByType<PlayerManager>();
+            nextNpcFocusAt = Time.time + NpcFocusGap;
         }
 
         public void Focus(PlayerActor actor, float seconds, bool vip, bool wide = false)
         {
-            if (actor == null || actor.IsNpc) return;
+            if (actor == null || !actor.gameObject.activeInHierarchy) return;
+            if (actor.IsNpc && (HasActiveFocus || welcomeQueue.Count > 0 || welcomeOverflow)) return;
+            focusNpc = actor.IsNpc;
             focusTarget = actor.transform;
             focusUntil = Time.time + Mathf.Clamp(seconds, 2f, 12f);
             focusVip = vip;
@@ -44,11 +53,13 @@ namespace TikTokLiveGame
             focusCrowdWelcome = false;
             focusStartedAt = Time.time;
             focusDuration = Mathf.Clamp(seconds, 2f, 12f);
+            nextNpcFocusAt = focusUntil + NpcFocusGap;
         }
 
         public void FocusFireworks(PlayerActor actor, float seconds = 6f)
         {
             if (actor == null || actor.IsNpc) return;
+            focusNpc = false;
             focusTarget = actor.transform;
             focusDuration = Mathf.Clamp(seconds, 5.5f, 8f);
             focusStartedAt = Time.time;
@@ -57,13 +68,17 @@ namespace TikTokLiveGame
             focusWide = false;
             focusFireworks = true;
             focusCrowdWelcome = false;
+            nextNpcFocusAt = focusUntil + NpcFocusGap;
         }
 
         public void QueueWelcome(PlayerActor actor, float seconds = 2f)
         {
             if (actor == null || actor.IsNpc) return;
+            if (HasActiveFocus && !focusNpc && focusTarget == actor.transform) return;
+            foreach (WelcomeRequest queued in welcomeQueue)
+                if (queued.Actor == actor) return;
             WelcomeRequest request = new(actor, Mathf.Clamp(seconds, 2f, 3f));
-            if (Time.time >= focusUntil && welcomeQueue.Count == 0 && !welcomeOverflow)
+            if ((!HasActiveFocus || focusNpc) && welcomeQueue.Count == 0 && !welcomeOverflow)
             {
                 StartWelcome(request);
                 return;
@@ -75,6 +90,7 @@ namespace TikTokLiveGame
         private void StartWelcome(WelcomeRequest request)
         {
             if (request.Actor == null || request.Actor.IsNpc) return;
+            focusNpc = false;
             focusTarget = request.Actor.transform;
             focusDuration = request.Seconds;
             focusStartedAt = Time.time;
@@ -83,11 +99,13 @@ namespace TikTokLiveGame
             focusWide = false;
             focusFireworks = false;
             focusCrowdWelcome = false;
+            nextNpcFocusAt = focusUntil + NpcFocusGap;
         }
 
         private void StartCrowdWelcome()
         {
             if (!TryGetViewerBounds(out _)) return;
+            focusNpc = false;
             focusTarget = null;
             focusDuration = 2.5f;
             focusStartedAt = Time.time;
@@ -96,11 +114,12 @@ namespace TikTokLiveGame
             focusWide = false;
             focusFireworks = false;
             focusCrowdWelcome = true;
+            nextNpcFocusAt = focusUntil + NpcFocusGap;
         }
 
         private void StartNextWelcomeIfReady()
         {
-            if (Time.time < focusUntil) return;
+            if (HasActiveFocus && !focusNpc) return;
             while (welcomeQueue.Count > 0)
             {
                 WelcomeRequest request = welcomeQueue.Dequeue();
@@ -116,7 +135,8 @@ namespace TikTokLiveGame
         private void LateUpdate()
         {
             StartNextWelcomeIfReady();
-            bool focusing = Time.time < focusUntil && (focusTarget != null || focusCrowdWelcome);
+            TryStartNpcFocus();
+            bool focusing = HasActiveFocus;
             Vector3 desiredPosition = defaultPosition;
             Vector3 desiredLookAt = defaultLookAt;
             float desiredFov = 45f;
@@ -186,7 +206,7 @@ namespace TikTokLiveGame
                     wasFocusing = false;
                 }
 
-                if (TryGetViewerBounds(out Bounds viewerBounds))
+                if (TryGetAmbientBounds(out Bounds crowdBounds))
                 {
                     float shotBeats = DirectorShotBars(directorShot) * 4f;
                     while (beat - directorShotStartBeat >= shotBeats)
@@ -202,11 +222,11 @@ namespace TikTokLiveGame
                     }
 
                     float progress = Mathf.Clamp01((beat - directorShotStartBeat) / Mathf.Max(1f, shotBeats));
-                    ConfigureDirectorShot(directorShot, directorCycle, progress, viewerBounds, ref desiredPosition, ref desiredLookAt, ref desiredFov);
+                    ConfigureDirectorShot(directorShot, directorCycle, progress, crowdBounds, ref desiredPosition, ref desiredLookAt, ref desiredFov);
                 }
                 else
                 {
-                    // NPCs keep dancing in the wide view without attracting a scan.
+                    // Keep an empty floor on the establishing shot.
                     directorShot = 0;
                     directorShotStartBeat = beat;
                 }
@@ -230,6 +250,21 @@ namespace TikTokLiveGame
             if (playerManager == null) playerManager = FindFirstObjectByType<PlayerManager>();
             bounds = default;
             return playerManager != null && playerManager.TryGetViewerBounds(out bounds);
+        }
+
+        private bool TryGetAmbientBounds(out Bounds bounds)
+        {
+            if (playerManager == null) playerManager = FindFirstObjectByType<PlayerManager>();
+            bounds = default;
+            return playerManager != null && playerManager.TryGetCrowdBounds(out bounds);
+        }
+
+        private void TryStartNpcFocus()
+        {
+            if (HasActiveFocus || Time.time < nextNpcFocusAt || welcomeQueue.Count > 0 || welcomeOverflow) return;
+            if (playerManager == null) playerManager = FindFirstObjectByType<PlayerManager>();
+            PlayerActor npc = playerManager?.NextNpcForCamera(ref npcFocusCursor);
+            if (npc != null) Focus(npc, NpcFocusSeconds, false);
         }
 
         private static float DirectorShotBars(int shot)
@@ -265,7 +300,7 @@ namespace TikTokLiveGame
             float t = Smooth(progress);
             float side = cycle % 2 == 0 ? -1f : 1f;
             float centerX = crowd.center.x;
-            // A sparse real audience must not inherit the old NPC floor sweep.
+            // Fit the shot to the crowd supplied by the caller.
             float halfWidth = crowd.extents.x + 0.45f;
             float left = centerX - halfWidth;
             float right = centerX + halfWidth;
@@ -280,7 +315,7 @@ namespace TikTokLiveGame
             float cameraFront = front + 9.5f;
             switch (shot)
             {
-                case 0: // Establish the real audience before scanning its rows.
+                case 0: // Establish the crowd before scanning its rows.
                     position = Vector3.Lerp(new Vector3(centerX, 9.4f, cameraFront + 2.2f), new Vector3(centerX, 8.7f, cameraFront + 1.2f), t);
                     lookAt = new Vector3(centerX, 0.95f, middle - 0.25f);
                     fov = Mathf.Lerp(54f, 50f, t);

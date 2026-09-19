@@ -68,6 +68,8 @@ resources="$stage/$APP_NAME/Contents/Resources"
 mkdir -p "$resources"
 ditto "$REPO_ROOT/DJ_MUSIC" "$resources/DJ_MUSIC"
 ditto "$REPO_ROOT/DJ_VIDEO" "$resources/DJ_VIDEO"
+mkdir -p "$resources/LiveAssets"
+ditto "$REPO_ROOT/LiveAssets/DJ_GIF" "$resources/LiveAssets/DJ_GIF"
 
 # Nobody wants to dig through "Show Package Contents" to swap a song, so expose
 # both folders next to run.command. The symlinks survive ditto's zip.

@@ -29,6 +29,12 @@ namespace TikTokLiveGame
         private GUIStyle titleStyle, nameStyle, scoreStyle, captionStyle;
         private float opacity, clearSince = -1f;
         private int renderedFrame = -1;
+        private Vector2 savedPosition = Vector2.one;
+        private Vector2 dragOffset;
+        private bool dragging, positionChanged;
+        private string positionKey = "TopPoints.Position";
+        internal bool IsPositioning { get; private set; }
+        internal bool IsDragging => dragging;
         internal bool AssetsReady => art.Count == 10;
         internal float Opacity => opacity;
         internal int ActiveRows => rows.FindAll(r => !r.Leaving).Count;
@@ -37,6 +43,9 @@ namespace TikTokLiveGame
 
         private void Awake()
         {
+            // Offline previews have their own layout and never overwrite the operator's position.
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-welcomePreviewPath") >= 0) positionKey += ".Preview";
+            LoadPosition();
             TextAsset json = Resources.Load<TextAsset>("TopPoints/manifest");
             if (json == null) { Debug.LogError("TopPoints manifest missing"); return; }
             Manifest manifest = JsonUtility.FromJson<Manifest>(json.text);
@@ -107,24 +116,107 @@ namespace TikTokLiveGame
         internal Rect GetPixelRect()
         {
             float scale = LayoutScale();
+            Vector2 size = new(230f * scale, 174f * scale);
+            Rect area = MovementArea();
+            return new Rect(new Vector2(
+                Mathf.Lerp(area.xMin, Mathf.Max(area.xMin, area.xMax - size.x), savedPosition.x),
+                Mathf.Lerp(area.yMin, Mathf.Max(area.yMin, area.yMax - size.y), savedPosition.y)), size);
+        }
+
+        private static Rect MovementArea()
+        {
+            float scale = LayoutScale();
             Rect safe = Screen.safeArea;
             if (safe.width <= 0f || safe.height <= 0f) safe = new Rect(0,0,Screen.width,Screen.height);
-            float top = Screen.height - safe.yMax;
-            return new Rect(safe.xMax - 242f*scale,
-                Mathf.Max(top, Screen.height-safe.yMin-202f*scale), 230f*scale, 174f*scale);
+            return Rect.MinMaxRect(safe.xMin + 12f * scale, Screen.height - safe.yMax + 12f * scale,
+                safe.xMax - 12f * scale, Screen.height - safe.yMin - 28f * scale);
         }
         // Approximately 31% of a portrait viewport's width, with safe-area margins.
         private static float LayoutScale() => Mathf.Max(0.1f, 0.74f*Mathf.Min(Screen.width/540f, Screen.height/960f));
 
+        internal void TogglePositioning()
+        {
+            FinishDrag();
+            IsPositioning = !IsPositioning;
+        }
+
+        internal void ResetPosition()
+        {
+            dragging = false;
+            savedPosition = Vector2.one;
+            positionChanged = true;
+            FinishDrag();
+        }
+
+        internal void LoadPosition()
+        {
+            float x = PlayerPrefs.GetFloat(positionKey + ".X", 1f);
+            float y = PlayerPrefs.GetFloat(positionKey + ".Y", 1f);
+            savedPosition = new Vector2(float.IsFinite(x) ? Mathf.Clamp01(x) : 1f, float.IsFinite(y) ? Mathf.Clamp01(y) : 1f);
+        }
+
+        private void FinishDrag()
+        {
+            dragging = false;
+            if (!positionChanged) return;
+            PlayerPrefs.SetFloat(positionKey + ".X", savedPosition.x);
+            PlayerPrefs.SetFloat(positionKey + ".Y", savedPosition.y);
+            PlayerPrefs.Save();
+            positionChanged = false;
+        }
+
+        private void OnApplicationFocus(bool focused) { if (!focused) FinishDrag(); }
+        private void OnDisable() => FinishDrag();
+
+        internal void HandlePointer(Event input, Vector2 pointer, bool canStart)
+        {
+            if (input.type == EventType.MouseDown && input.button == 0 && canStart)
+            {
+                Rect header = GetPixelRect();
+                header.height = 37f * LayoutScale();
+                if (!header.Contains(pointer)) return;
+                dragOffset = pointer - GetPixelRect().position;
+                dragging = true;
+                input.Use();
+            }
+            else if (dragging && input.type == EventType.MouseDrag && input.button == 0)
+            {
+                Rect area = MovementArea();
+                Vector2 size = GetPixelRect().size;
+                Vector2 target = pointer - dragOffset;
+                savedPosition = new Vector2(
+                    Mathf.InverseLerp(area.xMin, Mathf.Max(area.xMin, area.xMax - size.x), target.x),
+                    Mathf.InverseLerp(area.yMin, Mathf.Max(area.yMin, area.yMax - size.y), target.y));
+                positionChanged = true;
+                input.Use();
+            }
+            else if (dragging && input.rawType == EventType.MouseUp && input.button == 0)
+            {
+                FinishDrag();
+                input.Use();
+            }
+        }
+
         internal void Draw(PlayerManager players, bool enabledByUser, bool otherUiBlocks)
         {
+            if ((!enabledByUser || otherUiBlocks) && !IsPositioning) FinishDrag();
+            Matrix4x4 inputMatrix = GUI.matrix;
+            GUI.matrix = Matrix4x4.identity;
+            int dragControl = GUIUtility.GetControlID(72391, FocusType.Passive);
+            HandlePointer(Event.current, Event.current.mousePosition,
+                AssetsReady && (IsPositioning || enabledByUser && !otherUiBlocks && opacity > 0.95f));
+            if (dragging) GUIUtility.hotControl = dragControl;
+            else if (GUIUtility.hotControl == dragControl) GUIUtility.hotControl = 0;
+            GUI.matrix = inputMatrix;
             if (Event.current.type != EventType.Repaint) return;
+            bool arranging = IsPositioning || dragging;
             Rect pixelRect = GetPixelRect();
             bool blocked = !enabledByUser || otherUiBlocks || !AssetsReady || rows.Count == 0;
-            if (!blocked) blocked = players.OverlapsScreenRect(Camera.main, Expanded(pixelRect, 12f*LayoutScale()));
+            if (!blocked && !arranging) blocked = players.OverlapsScreenRect(Camera.main, Expanded(pixelRect, 12f*LayoutScale()));
+            if (IsPositioning && AssetsReady) blocked = false;
             if (blocked) { opacity = 0f; clearSince = -1f; return; }
             if (clearSince < 0f) clearSince = Time.unscaledTime;
-            opacity = Mathf.Clamp01((Time.unscaledTime-clearSince-0.5f)/0.2f);
+            opacity = arranging ? 1f : Mathf.Clamp01((Time.unscaledTime-clearSince-0.5f)/0.2f);
             if (opacity <= 0f) return;
             if (renderedFrame != Time.frameCount)
             {
@@ -140,6 +232,8 @@ namespace TikTokLiveGame
             DrawArt("panel", new Rect(0,0,230,174), true);
             GUI.Label(new Rect(14,11,165,25), "TOP ĐIỂM", titleStyle);
             GUI.Label(new Rect(175,22,39,12), "ĐIỂM", captionStyle);
+            if (IsPositioning)
+                GUI.Label(new Rect(14,30,204,14), "Kéo tiêu đề · F4 xong · F5 đặt lại", captionStyle);
             GUI.BeginGroup(new Rect(7,37,215,130));
             foreach (Row row in rows)
             {
@@ -173,6 +267,8 @@ namespace TikTokLiveGame
                 if (rank < 2) DrawArt("divider",new Rect(75+shift,y+(rank==0?45:34),131,1),true);
             }
             GUI.EndGroup();
+            if (IsPositioning && rows.Count == 0)
+                GUI.Label(new Rect(14,65,202,44), "Chưa có điểm\nVẫn có thể kéo bảng TOP", nameStyle);
             GUI.color = oldColor;
             GUI.matrix = oldMatrix;
         }

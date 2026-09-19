@@ -6,6 +6,7 @@ namespace TikTokLiveGame
     {
         private const int FloorLightingLayer = 8;
         private const float DjBoothHeightOffset = 0.85f;
+        private const float BackdropCenterY = 0f;
 
         internal static Texture2D CreateBackgroundTexture(Texture2D source)
         {
@@ -49,7 +50,7 @@ namespace TikTokLiveGame
 
             // CreateArchitecturalBackdrop(); // Hide acoustic wall and panels
 
-            Texture2D tex = Resources.Load<Texture2D>("Backgrounds/olachat-background-v3");
+            Texture2D tex = Resources.Load<Texture2D>("Backgrounds/olachat-background-v11");
             Texture2D bundledTexture = tex;
             // Keep the existing optional OlaChat override beside the executable.
             string path = System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "..", "olachat2.png"));
@@ -78,7 +79,7 @@ namespace TikTokLiveGame
             bgMat.mainTexture = tex;
 
             float texAspect = (float)tex.width / tex.height;
-            float H = 40f;
+            float H = 46f;
             float W = H * texAspect;
             float D = W * 3f; // Depth for side walls
 
@@ -103,7 +104,7 @@ namespace TikTokLiveGame
             GameObject centerQuad = GameObject.CreatePrimitive(PrimitiveType.Quad);
             centerQuad.name = "AmPhuBackdrop_Center";
             centerQuad.transform.SetParent(bgRoot.transform);
-            centerQuad.transform.localPosition = new Vector3(0, -3.0f, -12.5f);
+            centerQuad.transform.localPosition = new Vector3(0, BackdropCenterY, -12.5f);
             centerQuad.transform.localScale = new Vector3(W, H, 1);
             centerQuad.transform.localRotation = Quaternion.Euler(0, 180, 0);
             centerQuad.GetComponent<Renderer>().sharedMaterial = centerMat;
@@ -111,7 +112,7 @@ namespace TikTokLiveGame
             GameObject leftQuad = GameObject.CreatePrimitive(PrimitiveType.Quad);
             leftQuad.name = "AmPhuBackdrop_Left";
             leftQuad.transform.SetParent(bgRoot.transform);
-            leftQuad.transform.localPosition = new Vector3(W / 2f, -3.0f, -12.5f + D / 2f);
+            leftQuad.transform.localPosition = new Vector3(W / 2f, BackdropCenterY, -12.5f + D / 2f);
             leftQuad.transform.localScale = new Vector3(D, H, 1);
             leftQuad.transform.localRotation = Quaternion.Euler(0, -90, 0);
             leftQuad.GetComponent<Renderer>().sharedMaterial = leftMat;
@@ -119,7 +120,7 @@ namespace TikTokLiveGame
             GameObject rightQuad = GameObject.CreatePrimitive(PrimitiveType.Quad);
             rightQuad.name = "AmPhuBackdrop_Right";
             rightQuad.transform.SetParent(bgRoot.transform);
-            rightQuad.transform.localPosition = new Vector3(-W / 2f, -3.0f, -12.5f + D / 2f);
+            rightQuad.transform.localPosition = new Vector3(-W / 2f, BackdropCenterY, -12.5f + D / 2f);
             rightQuad.transform.localScale = new Vector3(D, H, 1);
             rightQuad.transform.localRotation = Quaternion.Euler(0, 90, 0);
             rightQuad.GetComponent<Renderer>().sharedMaterial = rightMat;
@@ -128,7 +129,7 @@ namespace TikTokLiveGame
             GameObject ceilingQuad = GameObject.CreatePrimitive(PrimitiveType.Quad);
             ceilingQuad.name = "AmPhuBackdrop_Ceiling";
             ceilingQuad.transform.SetParent(bgRoot.transform);
-            ceilingQuad.transform.localPosition = new Vector3(0, -3.0f + H / 2f, -12.5f + D / 2f);
+            ceilingQuad.transform.localPosition = new Vector3(0, BackdropCenterY + H / 2f, -12.5f + D / 2f);
             ceilingQuad.transform.localScale = new Vector3(W, D, 1);
             ceilingQuad.transform.localRotation = Quaternion.Euler(90, 180, 0); // Xoay 180 để mặt Quad hướng xuống dưới đất
             ceilingQuad.GetComponent<Renderer>().sharedMaterial = ceilingMat;
@@ -139,10 +140,6 @@ namespace TikTokLiveGame
             floor.transform.localScale = new Vector3(100f, 0.5f, 100f);
             floor.GetComponent<Renderer>().enabled = false;
 
-            CreateRaisedStage();
-            // CreateDjVideoScreen();
-            CreateDjBooth();
-            CreateDjPerformer();
             // CreateArchitecturalAccentLights();
             CreateCircularTrussRig();
             // CreateLedBarRig();
@@ -165,6 +162,13 @@ namespace TikTokLiveGame
                 }
             }
             clubRoot.transform.position = new Vector3(0, 0, -12f);
+
+            // Keep the stage in front of the backdrop at z = -12.5.
+            // The lighting rig's offset would otherwise hide both the video and the DJ.
+            CreateRaisedStage();
+            CreateDjVideoScreen();
+            CreateDjBooth();
+            CreateDjPerformer();
 
             new GameObject("Club Beat").AddComponent<ClubPulseController>();
 
@@ -269,7 +273,11 @@ namespace TikTokLiveGame
             // Thêm Script GifPlayer để tự động phát
             GifPlayer gifPlayer = performer.AddComponent<GifPlayer>();
             
-            string frameDir = System.IO.Path.Combine(Application.dataPath, "../../LiveAssets/DJ_GIF");
+            // Packaged frames live beside the player data; Editor/local builds can use the repo copy.
+            string mediaRoot = System.IO.Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
+            string frameDir = System.IO.Path.Combine(mediaRoot, "LiveAssets", "DJ_GIF");
+            if (!System.IO.Directory.Exists(frameDir))
+                frameDir = System.IO.Path.GetFullPath(System.IO.Path.Combine(mediaRoot, "..", "LiveAssets", "DJ_GIF"));
             if (!System.IO.Directory.Exists(frameDir))
                 frameDir = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "LiveAssets/DJ_GIF");
             
