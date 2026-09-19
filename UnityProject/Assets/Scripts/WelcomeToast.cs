@@ -49,6 +49,13 @@ namespace TikTokLiveGame
         private Vector2 viewport;
         private float frameRadius;
         private bool ready;
+        internal bool DisplayEnabled { get; private set; } = true;
+
+        internal void SetDisplayEnabled(bool value)
+        {
+            DisplayEnabled = value;
+            if (!value) { pending.Clear(); current = null; }
+        }
         private int flockDrawCalls;
 
         internal int PendingCount => pending.Count;
@@ -232,6 +239,8 @@ namespace TikTokLiveGame
             if (data.type is not ("member" or "chat" or "gift" or "like" or "follow" or "share")) return;
             if (string.IsNullOrWhiteSpace(data.userId) || data.userId.StartsWith("npc-", StringComparison.Ordinal)) return;
             if (players == null || players.Find(data.userId) == null || greeted.Contains(data.userId)) return;
+            // Remember joins while hidden so enabling the switch does not replay old welcomes.
+            if (!DisplayEnabled) { Remember(data.userId); return; }
             if (pending.Count >= QueueLimit) return;
             string name = string.IsNullOrWhiteSpace(data.nickname) ? data.uniqueId : data.nickname;
             name = string.IsNullOrWhiteSpace(name) ? "Khách mới" : name.Replace('\n', ' ').Replace('\r', ' ').Trim();

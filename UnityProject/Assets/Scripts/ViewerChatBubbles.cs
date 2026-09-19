@@ -23,6 +23,13 @@ namespace TikTokLiveGame
         internal int ActiveCount => entries.Count;
         internal IReadOnlyList<Placement> Visible => visible;
         internal bool AssetsReady => bubble != null && sparkle != null;
+        internal bool DisplayEnabled { get; private set; } = true;
+
+        internal void SetDisplayEnabled(bool value)
+        {
+            DisplayEnabled = value;
+            if (!value) { entries.Clear(); candidates.Clear(); visible.Clear(); }
+        }
 
         private void Awake()
         {
@@ -37,7 +44,7 @@ namespace TikTokLiveGame
         {
             if (data == null) return;
             if (data.type is "reset" or "snapshot") { entries.Clear(); visible.Clear(); return; }
-            if (data.type != "chat") return;
+            if (!DisplayEnabled || data.type != "chat") return;
             PlayerActor actor = players.Find(data.userId);
             // A spectator's comment must not bypass the existing join policy.
             if (!IsRealViewer(actor)) return;
@@ -100,7 +107,7 @@ namespace TikTokLiveGame
         {
             if (Event.current.type != EventType.Repaint) return;
             visible.Clear();
-            if (camera == null || controlsOpen || !AssetsReady) return;
+            if (!DisplayEnabled || camera == null || controlsOpen || !AssetsReady) return;
             EnsureStyle();
             Matrix4x4 oldMatrix = GUI.matrix;
             Color oldColor = GUI.color;

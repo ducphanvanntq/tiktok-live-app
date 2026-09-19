@@ -16,6 +16,9 @@ namespace TikTokLiveGame
         private bool focusFireworks;
         private bool focusCrowdWelcome;
         private bool focusNpc;
+        private bool focusChat;
+        private bool npcFocusEnabled = true;
+        private bool chatFocusEnabled = true;
         private const float NpcFocusSeconds = 3f;
         private const float NpcFocusGap = 8f;
         private float nextNpcFocusAt;
@@ -24,6 +27,7 @@ namespace TikTokLiveGame
         private float focusDuration;
         private readonly Queue<WelcomeRequest> welcomeQueue = new();
         private bool welcomeOverflow;
+        private bool chatOverflow;
         private Vector3 currentLookAt;
         private int directorShot;
         private int directorCycle;
@@ -31,6 +35,30 @@ namespace TikTokLiveGame
         private bool wasFocusing;
         private PlayerManager playerManager;
         private bool HasActiveFocus => Time.time < focusUntil && (focusTarget != null || focusCrowdWelcome);
+
+        internal void ConfigureFocus(bool npcs, bool chats)
+        {
+            if (npcs && !npcFocusEnabled) nextNpcFocusAt = Time.time + NpcFocusGap;
+            npcFocusEnabled = npcs;
+            chatFocusEnabled = chats;
+            if (!chats)
+            {
+                int count = welcomeQueue.Count;
+                for (int i = 0; i < count; i++)
+                {
+                    WelcomeRequest request = welcomeQueue.Dequeue();
+                    if (!request.FromChat) welcomeQueue.Enqueue(request);
+                }
+                chatOverflow = false;
+            }
+            if ((!npcs && focusNpc) || (!chats && focusChat))
+            {
+                focusUntil = Time.time;
+                focusTarget = null;
+                focusCrowdWelcome = false;
+                focusNpc = focusChat = false;
+            }
+        }
 
         private void Awake()
         {
@@ -43,7 +71,8 @@ namespace TikTokLiveGame
         public void Focus(PlayerActor actor, float seconds, bool vip, bool wide = false)
         {
             if (actor == null || !actor.gameObject.activeInHierarchy) return;
-            if (actor.IsNpc && (HasActiveFocus || welcomeQueue.Count > 0 || welcomeOverflow)) return;
+            if (actor.IsNpc && (!npcFocusEnabled || HasActiveFocus || welcomeQueue.Count > 0 || welcomeOverflow || chatOverflow)) return;
+            focusChat = false;
             focusNpc = actor.IsNpc;
             focusTarget = actor.transform;
             focusUntil = Time.time + Mathf.Clamp(seconds, 2f, 12f);
@@ -59,6 +88,7 @@ namespace TikTokLiveGame
         public void FocusFireworks(PlayerActor actor, float seconds = 6f)
         {
             if (actor == null || actor.IsNpc) return;
+            focusChat = false;
             focusNpc = false;
             focusTarget = actor.transform;
             focusDuration = Mathf.Clamp(seconds, 5.5f, 8f);
@@ -71,25 +101,27 @@ namespace TikTokLiveGame
             nextNpcFocusAt = focusUntil + NpcFocusGap;
         }
 
-        public void QueueWelcome(PlayerActor actor, float seconds = 2f)
+        public void QueueWelcome(PlayerActor actor, float seconds = 2f, bool fromChat = false)
         {
-            if (actor == null || actor.IsNpc) return;
+            if (actor == null || actor.IsNpc || fromChat && !chatFocusEnabled) return;
             if (HasActiveFocus && !focusNpc && focusTarget == actor.transform) return;
             foreach (WelcomeRequest queued in welcomeQueue)
                 if (queued.Actor == actor) return;
-            WelcomeRequest request = new(actor, Mathf.Clamp(seconds, 2f, 3f));
-            if ((!HasActiveFocus || focusNpc) && welcomeQueue.Count == 0 && !welcomeOverflow)
+            WelcomeRequest request = new(actor, Mathf.Clamp(seconds, 2f, 3f), fromChat);
+            if ((!HasActiveFocus || focusNpc) && welcomeQueue.Count == 0 && !welcomeOverflow && !chatOverflow)
             {
                 StartWelcome(request);
                 return;
             }
             if (welcomeQueue.Count < 3) welcomeQueue.Enqueue(request);
+            else if (fromChat) chatOverflow = true;
             else welcomeOverflow = true;
         }
 
         private void StartWelcome(WelcomeRequest request)
         {
             if (request.Actor == null || request.Actor.IsNpc) return;
+            focusChat = request.FromChat;
             focusNpc = false;
             focusTarget = request.Actor.transform;
             focusDuration = request.Seconds;
@@ -102,9 +134,10 @@ namespace TikTokLiveGame
             nextNpcFocusAt = focusUntil + NpcFocusGap;
         }
 
-        private void StartCrowdWelcome()
+        private void StartCrowdWelcome(bool fromChat)
         {
             if (!TryGetViewerBounds(out _)) return;
+            focusChat = fromChat;
             focusNpc = false;
             focusTarget = null;
             focusDuration = 2.5f;
@@ -127,9 +160,11 @@ namespace TikTokLiveGame
                 StartWelcome(request);
                 return;
             }
-            if (!welcomeOverflow) return;
+            if (!welcomeOverflow && !chatOverflow) return;
+            bool fromChat = !welcomeOverflow;
             welcomeOverflow = false;
-            StartCrowdWelcome();
+            chatOverflow = false;
+            StartCrowdWelcome(fromChat);
         }
 
         private void LateUpdate()
@@ -256,12 +291,12 @@ namespace TikTokLiveGame
         {
             if (playerManager == null) playerManager = FindFirstObjectByType<PlayerManager>();
             bounds = default;
-            return playerManager != null && playerManager.TryGetCrowdBounds(out bounds);
+            return playerManager != null && (npcFocusEnabled ? playerManager.TryGetCrowdBounds(out bounds) : playerManager.TryGetViewerBounds(out bounds));
         }
 
         private void TryStartNpcFocus()
         {
-            if (HasActiveFocus || Time.time < nextNpcFocusAt || welcomeQueue.Count > 0 || welcomeOverflow) return;
+            if (!npcFocusEnabled || HasActiveFocus || Time.time < nextNpcFocusAt || welcomeQueue.Count > 0 || welcomeOverflow || chatOverflow) return;
             if (playerManager == null) playerManager = FindFirstObjectByType<PlayerManager>();
             PlayerActor npc = playerManager?.NextNpcForCamera(ref npcFocusCursor);
             if (npc != null) Focus(npc, NpcFocusSeconds, false);
@@ -280,11 +315,13 @@ namespace TikTokLiveGame
         {
             public PlayerActor Actor { get; }
             public float Seconds { get; }
+            public bool FromChat { get; }
 
-            public WelcomeRequest(PlayerActor actor, float seconds)
+            public WelcomeRequest(PlayerActor actor, float seconds, bool fromChat)
             {
                 Actor = actor;
                 Seconds = seconds;
+                FromChat = fromChat;
             }
         }
 

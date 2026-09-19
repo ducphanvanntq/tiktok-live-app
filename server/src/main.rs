@@ -163,6 +163,14 @@ async fn build_state(root: &Path) -> Result<SharedState, String> {
         }
     );
 
+    let display = match read_json(&paths.config_dir.join("display.json")).await {
+        Ok(value) => serde_json::from_value(value).unwrap_or_else(|error| {
+            tracing::warn!("display.json không hợp lệ, dùng mặc định: {error}");
+            tiktok_server::domain::display::DisplayConfig::default()
+        }),
+        Err(_) => tiktok_server::domain::display::DisplayConfig::default(),
+    };
+
     Ok(Arc::new(AppState {
         settings,
         paths,
@@ -174,6 +182,7 @@ async fn build_state(root: &Path) -> Result<SharedState, String> {
         tikfinity_ws_url,
         log_tiktok_events: std::env::var("LOG_TIKTOK_EVENTS").as_deref() == Ok("1"),
         master: RwLock::new(master),
+        display: RwLock::new(display),
         observed_gifts: RwLock::new(observed_gifts),
         session: RwLock::new(Session::new()),
         status: RwLock::new(ConnectionStatus::default()),

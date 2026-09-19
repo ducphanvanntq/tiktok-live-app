@@ -17,6 +17,7 @@ loadEnvironmentFile();
 const { normalizeTikFinityMessage } = require('./src/tiktok/normalize-tikfinity-event');
 const { mergeObservedGift } = require('./src/tiktok/observed-gift');
 const { PointsLeaderboard } = require('./src/points-leaderboard');
+const { DisplaySettings } = require('./src/config/display');
 const {
     normalizeChat,
     normalizeMember,
@@ -54,6 +55,7 @@ const assetsDir = path.join(__dirname, 'assets');
 const gifsDir = path.join(assetsDir, 'gifs');
 const masterConfigPath = path.join(__dirname, 'config', 'master.json');
 const observedGiftsPath = path.join(__dirname, 'config', 'observed-gifts.json');
+const displaySettings = new DisplaySettings(process.env.DISPLAY_CONFIG_PATH || path.join(__dirname, 'config', 'display.json'));
 const LIVE_PROVIDER = String(process.env.LIVE_PROVIDER || gameConfig.liveProvider || 'tikfinity').toLowerCase();
 const TIKFINITY_WS_URL = String(process.env.TIKFINITY_WS_URL || gameConfig.tikfinityWsUrl || 'ws://127.0.0.1:21213/');
 // Đặt LOG_TIKTOK_EVENTS=1 để in từng sự kiện nhận được từ TikTok. Mặc định tắt
@@ -798,6 +800,7 @@ async function handleClientMessage(ws, message) {
         }
         ws.role = message.role;
         ws.registered = true;
+        send(ws, { type: 'display_config', display: displaySettings.value });
         send(ws, { type: 'config', game: gameConfig, gifts: giftConfig });
         send(ws, { type: 'status', ...connectionStatus });
         send(ws, { type: 'metrics', ...metrics });
@@ -812,7 +815,7 @@ async function handleClientMessage(ws, message) {
 
     if (!ws.registered) return send(ws, { type: 'error', message: 'Client chưa đăng ký quyền.' });
 
-    const controlOnly = message.type === 'master_save' || message.type === 'master_test';
+    const controlOnly = ['master_save', 'master_test', 'display_update'].includes(message.type);
     const operatorOnly = new Set([
         'set_username', 'disconnect_tiktok', 'demo_start', 'demo_stop', 'demo_event', 'reset_game'
     ]).has(message.type);
@@ -821,6 +824,17 @@ async function handleClientMessage(ws, message) {
     }
     if (operatorOnly && ws.role !== 'control' && !ws.nativeClient) {
         return send(ws, { type: 'error', message: 'Client không có quyền điều khiển.' });
+    }
+
+    if (message.type === 'display_update') {
+        try {
+            const display = await displaySettings.update(message.patch);
+            broadcast({ type: 'display_config', display });
+        } catch (error) {
+            send(ws, { type: 'display_error', message: 'Không lưu được cài đặt hiển thị. Thử lại.', display: displaySettings.value });
+            console.warn(`Cài đặt hiển thị: ${error.message}`);
+        }
+        return;
     }
 
     if (message.type === 'master_save') {

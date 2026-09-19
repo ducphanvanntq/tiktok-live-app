@@ -36,6 +36,12 @@ namespace TikTokLiveGame
         {
             if (welcomeDirectory != null)
             {
+                if (Array.IndexOf(Environment.GetCommandLineArgs(), "-displaySettingsPreview") >= 0)
+                {
+                    DisplaySettingsCaptureHarness displayPreview = root.AddComponent<DisplaySettingsCaptureHarness>();
+                    displayPreview.StartCoroutine(displayPreview.Capture(welcomeDirectory));
+                    return;
+                }
                 if (Array.IndexOf(Environment.GetCommandLineArgs(), "-cameraFocusPreview") >= 0)
                 {
                     CameraFocusCaptureHarness cameraPreview = root.AddComponent<CameraFocusCaptureHarness>();

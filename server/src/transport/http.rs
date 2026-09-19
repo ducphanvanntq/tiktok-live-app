@@ -171,6 +171,7 @@ mod tests {
             tikfinity_ws_url: "ws://127.0.0.1:21213/".into(),
             log_tiktok_events: false,
             master: RwLock::new(MasterConfig::default()),
+            display: RwLock::new(Default::default()),
             observed_gifts: RwLock::new(BTreeMap::new()),
             session: RwLock::new(Session::new()),
             status: RwLock::new(ConnectionStatus::default()),

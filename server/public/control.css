@@ -872,3 +872,13 @@ kbd {
     .demo-grid   { grid-template-columns: repeat(2,1fr); }
     .rule-row-bot { grid-template-columns: 1fr 1fr; }
 }
+
+/* Live display switches stay keyboard-accessible while using the existing track. */
+.display-settings { margin-top: 20px; }
+.display-switch { position: relative; padding: 16px 0; gap: 14px; border-bottom: 1px solid var(--border); }
+.display-switch strong { display: block; color: var(--text); font-size: 14px; }
+.display-switch small { display: block; margin-top: 5px; line-height: 1.5; }
+.display-switch input[type="checkbox"] { display: block; position: absolute; opacity: 0; width: 34px; height: 24px; margin: 0; }
+.display-switch input:focus-visible + .toggle-track { outline: 2px solid var(--success); outline-offset: 4px; }
+.display-switch input:disabled ~ span { opacity: 0.55; }
+.display-settings [role="status"] { margin-top: 14px; min-height: 1.5em; }

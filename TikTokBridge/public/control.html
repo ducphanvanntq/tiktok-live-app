@@ -93,6 +93,51 @@
             </div>
         </div>
     </div>
+    <div class="card display-settings">
+        <div class="card-header">
+            <div>
+                <p class="card-label">Hiển thị trong game</p>
+                <h2 class="card-title">Tùy chỉnh giao diện live</h2>
+            </div>
+        </div>
+        <p class="help">Mặc định bật tất cả. Gạt công tắc để ẩn hoặc hiện; tự lưu và áp dụng ngay.</p>
+        <label class="toggle-wrap display-switch">
+            <input id="display-top" data-display="showTop" type="checkbox" role="switch" checked disabled>
+            <span class="toggle-track" aria-hidden="true"></span>
+            <span><strong>TOP điểm</strong><small>Bảng xếp hạng trên màn hình. Điểm vẫn được tính khi ẩn.</small></span>
+        </label>
+        <label class="toggle-wrap display-switch">
+            <input id="display-welcome" data-display="showWelcome" type="checkbox" role="switch" checked disabled>
+            <span class="toggle-track" aria-hidden="true"></span>
+            <span><strong>Thông báo vào sàn</strong><small>Khung chào và hiệu ứng khi người xem tham gia sàn.</small></span>
+        </label>
+        <label class="toggle-wrap display-switch">
+            <input id="display-chat" data-display="showChat" type="checkbox" role="switch" checked disabled>
+            <span class="toggle-track" aria-hidden="true"></span>
+            <span><strong>Chat người xem</strong><small>Bong bóng trên nhân vật và dòng chat trong game.</small></span>
+        </label>
+        <label class="toggle-wrap display-switch">
+            <input id="display-feed" data-display="showFeed" type="checkbox" role="switch" checked disabled>
+            <span class="toggle-track" aria-hidden="true"></span>
+            <span><strong>Dòng sự kiện</strong><small>Những dòng chat, quà, tham gia và follow ở góc màn hình.</small></span>
+        </label>
+        <label class="toggle-wrap display-switch">
+            <input id="display-gift-effects" data-display="showGiftEffects" type="checkbox" role="switch" checked disabled>
+            <span class="toggle-track" aria-hidden="true"></span>
+            <span><strong>Hiệu ứng quà</strong><small>Thông báo quà, pháo hoa, âm thanh pháo hoa và spotlight. Quà vẫn tính điểm và thực hiện hành động.</small></span>
+        </label>
+        <label class="toggle-wrap display-switch">
+            <input id="display-focus-npc" data-display="focusNpc" type="checkbox" role="switch" checked disabled>
+            <span class="toggle-track" aria-hidden="true"></span>
+            <span><strong>Focus bot</strong><small>Camera tự quay cận bot lúc sàn yên. Người xem thật vẫn được ưu tiên.</small></span>
+        </label>
+        <label class="toggle-wrap display-switch">
+            <input id="display-focus-chat" data-display="focusChat" type="checkbox" role="switch" checked disabled>
+            <span class="toggle-track" aria-hidden="true"></span>
+            <span><strong>Focus khi chat</strong><small>Camera ưu tiên người đang chat. Tắt vẫn giữ focus do tham gia, quà hoặc lệnh camera.</small></span>
+        </label>
+        <p id="display-message" class="help" role="status" aria-live="polite">Đang tải cài đặt…</p>
+    </div>
 </section>
 
 <!-- ── MASTER RULES ── -->

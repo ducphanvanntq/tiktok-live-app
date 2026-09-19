@@ -1,0 +1,9 @@
+{
+  "showTop": true,
+  "showWelcome": true,
+  "showChat": true,
+  "showFeed": true,
+  "showGiftEffects": true,
+  "focusNpc": true,
+  "focusChat": true
+}

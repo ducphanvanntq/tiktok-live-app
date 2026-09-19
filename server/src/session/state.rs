@@ -4,6 +4,7 @@ use crate::config::{Paths, ServerSettings};
 use crate::domain::event::{GameEvent, PlayerState, VipScore};
 use crate::domain::gifts::{GiftCatalog, ObservedGift};
 use crate::domain::rules::MasterConfig;
+use crate::domain::display::DisplayConfig;
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -182,6 +183,7 @@ pub struct AppState {
     pub log_tiktok_events: bool,
 
     pub master: RwLock<MasterConfig>,
+    pub display: RwLock<DisplayConfig>,
     pub observed_gifts: RwLock<BTreeMap<String, ObservedGift>>,
     pub session: RwLock<Session>,
     pub status: RwLock<ConnectionStatus>,

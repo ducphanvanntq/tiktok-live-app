@@ -57,6 +57,46 @@ let socket;
 let reconnectTimer;
 let masterConfig = { joinMode: 'keyword_only', giftAlwaysJoins: true, rules: [] };
 const recentGifts = new Map();
+const displayInputs = [...document.querySelectorAll('[data-display]')];
+const displayMessage = document.getElementById('display-message');
+let displayConfig = Object.fromEntries(displayInputs.map(input => [input.dataset.display, true]));
+let displayReady = false;
+let displayTimer;
+
+function renderDisplay(config, message = 'Đã đồng bộ cài đặt hiển thị.') {
+    clearTimeout(displayTimer);
+    displayReady = true;
+    for (const input of displayInputs) {
+        displayConfig[input.dataset.display] = config?.[input.dataset.display] !== false;
+        input.checked = displayConfig[input.dataset.display];
+        input.disabled = false;
+    }
+    displayMessage.textContent = message;
+}
+
+function lockDisplay(message) {
+    displayReady = false;
+    clearTimeout(displayTimer);
+    for (const input of displayInputs) {
+        input.checked = displayConfig[input.dataset.display];
+        input.disabled = true;
+    }
+    displayMessage.textContent = message;
+}
+
+for (const input of displayInputs) input.addEventListener('change', () => {
+    if (!displayReady || socket?.readyState !== WebSocket.OPEN) {
+        lockDisplay('Chờ kết nối máy chủ để thay đổi.');
+        return;
+    }
+    const patch = { [input.dataset.display]: input.checked };
+    displayReady = false;
+    for (const item of displayInputs) item.disabled = true;
+    displayMessage.textContent = 'Đang lưu…';
+    send({ type: 'display_update', patch });
+    // Reconnect to obtain the saved state if the acknowledgment is lost.
+    displayTimer = setTimeout(() => socket.close(), 8000);
+});
 
 /* ═══ WEBSOCKET ══════════════════════════════════════════ */
 function send(message) {
@@ -228,6 +268,8 @@ function connectSocket() {
         if (data.type === 'status' || data.type === 'error') setStatus(data);
         if (data.type === 'metrics')        setMetrics(data);
         if (data.type === 'master_config')  renderMaster(data.master);
+        if (data.type === 'display_config') renderDisplay(data.display);
+        if (data.type === 'display_error') renderDisplay(data.display, data.message || 'Chưa lưu được cài đặt. Thử lại.');
         if (data.type === 'master_saved')   setMasterMessage(data.message || 'Đã lưu Master.');
         if (data.type === 'gift_observed')  observeGift(data);
         if (data.type === 'gift_catalog') {
@@ -240,6 +282,7 @@ function connectSocket() {
     });
 
     socket.addEventListener('close', () => {
+        lockDisplay('Mất kết nối. Cài đặt đã lưu sẽ được đồng bộ khi kết nối lại.');
         setStatus({ state: 'disconnected', message: 'Đang kết nối lại máy chủ…' });
         reconnectTimer = setTimeout(connectSocket, 2000);
     });

@@ -25,6 +25,7 @@ namespace TikTokLiveGame
         private float partyEnergy;
         private bool controlsVisible;
         private bool hudVisible = true;
+        private DisplayConfig displayConfig = new();
         private bool chromaMode;
         private int cinematicVersion;
         private bool restoreControlsAfterCinematic;
@@ -61,8 +62,8 @@ namespace TikTokLiveGame
         {
             if (Input.GetKeyDown(KeyCode.F1)) controlsVisible = !controlsVisible;
             if (Input.GetKeyDown(KeyCode.F2)) ToggleChroma();
-            if (Input.GetKeyDown(KeyCode.F3)) hudVisible = !hudVisible;
-            if (Input.GetKeyDown(KeyCode.F4))
+            if (Input.GetKeyDown(KeyCode.F3) && displayConfig.showTop) hudVisible = !hudVisible;
+            if (Input.GetKeyDown(KeyCode.F4) && displayConfig.showTop)
             {
                 topPoints.TogglePositioning();
                 if (topPoints.IsPositioning) controlsVisible = false;
@@ -75,6 +76,20 @@ namespace TikTokLiveGame
 
         private void HandleEvent(TikTokEvent liveEvent)
         {
+            if (liveEvent.type == "display_config")
+            {
+                if (liveEvent.display == null) return;
+                if (displayConfig.showTop != liveEvent.display.showTop) hudVisible = liveEvent.display.showTop;
+                displayConfig = liveEvent.display;
+                if (!displayConfig.showTop && topPoints.IsPositioning) topPoints.TogglePositioning();
+                welcomeToast.SetDisplayEnabled(displayConfig.showWelcome);
+                chatBubbles.SetDisplayEnabled(displayConfig.showChat);
+                giftEffects.SetDisplayEnabled(displayConfig.showGiftEffects);
+                clubCamera?.ConfigureFocus(displayConfig.focusNpc, displayConfig.focusChat);
+                if (!displayConfig.showFeed) feed.Clear();
+                feed.RemoveAll(item => !displayConfig.showChat && item.Kind == "chat" || !displayConfig.showWelcome && item.Kind == "member");
+                return;
+            }
             if (liveEvent.type == "status") connectionStatus = liveEvent.message;
             if (liveEvent.type is "member" or "chat" or "gift" or "like" or "follow" or "share") events++;
 
@@ -93,7 +108,7 @@ namespace TikTokLiveGame
             else if (liveEvent.type == "chat")
             {
                 AddEnergy(2f);
-                AddFeed($"{liveEvent.nickname}: {liveEvent.comment}", Color.white);
+                if (displayConfig.showChat) AddFeed($"{liveEvent.nickname}: {liveEvent.comment}", Color.white, "chat");
             }
             else if (liveEvent.type == "like")
             {
@@ -102,7 +117,7 @@ namespace TikTokLiveGame
             else if (liveEvent.type == "member")
             {
                 AddEnergy(1f);
-                AddFeed($"{liveEvent.nickname} vào sàn", new Color(0.35f, 0.95f, 1f));
+                if (displayConfig.showWelcome) AddFeed($"{liveEvent.nickname} vào sàn", new Color(0.35f, 0.95f, 1f), "member");
             }
             else if (liveEvent.type is "follow" or "share")
             {
@@ -130,7 +145,7 @@ namespace TikTokLiveGame
             bool joinFocus = liveEvent.action == "join" && liveEvent.joinedNow;
             bool socialFocus = liveEvent.type is "follow" or "share";
             bool actionFocus = liveEvent.action is "camera" or "walk" or "vip" or "topdj" or "fireworks" or "medal";
-            bool chatFocus = liveEvent.type == "chat" && !joinFocus && !actionFocus && ChatBubbleText.Clean(liveEvent.comment).Length > 0;
+            bool chatFocus = displayConfig.focusChat && liveEvent.type == "chat" && !joinFocus && !actionFocus && ChatBubbleText.Clean(liveEvent.comment).Length > 0;
             bool requestsFocus = joinFocus || socialFocus || actionFocus || chatFocus;
             if (requestsFocus && (liveEvent.type is "gift" or "chat" or "follow" or "share"))
             {
@@ -141,7 +156,7 @@ namespace TikTokLiveGame
                 bool wideWalkFocus = liveEvent.action == "walk";
                 if (joinFocus || socialFocus || chatFocus)
                 {
-                    clubCamera?.QueueWelcome(actor, focusSeconds);
+                    clubCamera?.QueueWelcome(actor, focusSeconds, chatFocus);
                 }
                 else if (liveEvent.action == "fireworks")
                     clubCamera?.FocusFireworks(actor, Mathf.Max(6f, focusSeconds));
@@ -188,9 +203,10 @@ namespace TikTokLiveGame
             giftEffects.PartyBurst();
         }
 
-        private void AddFeed(string text, Color color)
+        private void AddFeed(string text, Color color, string kind = "")
         {
-            feed.Add(new FeedEntry(text, color, Time.unscaledTime));
+            if (!displayConfig.showFeed) return;
+            feed.Add(new FeedEntry(text, color, Time.unscaledTime, kind));
             if (feed.Count > 7) feed.RemoveAt(0);
         }
 
@@ -203,7 +219,7 @@ namespace TikTokLiveGame
             float width = Screen.width / scale;
             float height = Screen.height / scale;
 
-            DrawFeed(height);
+            if (displayConfig.showFeed) DrawFeed(height);
             if (controlsVisible) DrawControls();
 
             if (giftEffects != null && Time.unscaledTime < giftEffects.BannerUntil)
@@ -215,7 +231,8 @@ namespace TikTokLiveGame
             // Welcomes have moving wings outside their card; conservatively
             // reserve the whole animation rather than just its background.
             bool bannerActive = giftEffects != null && Time.unscaledTime < giftEffects.BannerUntil;
-            topPoints.Draw(playerManager, hudVisible,
+            if (!displayConfig.showTop && topPoints.IsPositioning) topPoints.TogglePositioning();
+            topPoints.Draw(playerManager, hudVisible && displayConfig.showTop,
                 controlsVisible || welcomeToast.ActiveUserId != null || bannerActive);
 
             chatBubbles.Draw(Camera.main, topPoints.Opacity > 0f ? topPoints.GetPixelRect() : default, controlsVisible);
@@ -361,7 +378,8 @@ namespace TikTokLiveGame
             public readonly string Text;
             public readonly Color Color;
             public readonly float Time;
-            public FeedEntry(string text, Color color, float time) { Text = text; Color = color; Time = time; }
+            public readonly string Kind;
+            public FeedEntry(string text, Color color, float time, string kind) { Text = text; Color = color; Time = time; Kind = kind; }
         }
 
         private void OnDestroy()

@@ -10,6 +10,37 @@ namespace TikTokLiveGame
         private AudioClip fireworkClip;
         public string BannerText { get; private set; } = string.Empty;
         public float BannerUntil { get; private set; }
+        internal bool DisplayEnabled { get; private set; } = true;
+        private GameObject effectRoot;
+
+        internal void SetDisplayEnabled(bool value)
+        {
+            DisplayEnabled = value;
+            if (value) return;
+            StopAllCoroutines();
+            fireworkAudio?.Stop();
+            BannerText = string.Empty;
+            BannerUntil = 0f;
+            combos.Clear();
+            if (effectRoot != null)
+            {
+                effectRoot.SetActive(false);
+                Destroy(effectRoot);
+                effectRoot = null;
+            }
+        }
+
+        private GameObject CreateEffect(string name)
+        {
+            if (effectRoot == null)
+            {
+                effectRoot = new GameObject("Gift Visual Effects");
+                effectRoot.transform.SetParent(transform, false);
+            }
+            GameObject effect = new(name);
+            effect.transform.SetParent(effectRoot.transform, false);
+            return effect;
+        }
 
         private void Awake()
         {
@@ -25,7 +56,7 @@ namespace TikTokLiveGame
 
         public void Play(TikTokEvent data, PlayerActor actor)
         {
-            if (data.type != "gift") return;
+            if (!DisplayEnabled || data.type != "gift") return;
             string gift = string.IsNullOrWhiteSpace(data.giftName) ? "Gift" : data.giftName;
             combos.TryGetValue(data.userId ?? string.Empty, out ComboState combo);
             int count = Time.unscaledTime - combo.LastTime <= 5f ? combo.Count + 1 : 1;
@@ -42,6 +73,7 @@ namespace TikTokLiveGame
 
         public void PartyBurst()
         {
+            if (!DisplayEnabled) return;
             BannerText = "PARTY ENERGY MAX — CẢ SÀN CÙNG QUẨY";
             BannerUntil = Time.unscaledTime + 6f;
             LaunchFireworks(5);
@@ -49,7 +81,7 @@ namespace TikTokLiveGame
 
         private IEnumerator Spotlight(PlayerActor actor, TikTokEvent data)
         {
-            GameObject lightObject = new($"Gift Spotlight — {actor.Nickname}");
+            GameObject lightObject = CreateEffect($"Gift Spotlight — {actor.Nickname}");
             Light light = lightObject.AddComponent<Light>();
             light.type = LightType.Spot;
             light.color = data.diamondCount >= 100 ? new Color(1f, 0.22f, 0.68f) : new Color(0.2f, 0.9f, 1f);
@@ -108,7 +140,7 @@ namespace TikTokLiveGame
 
         private void CreateColdFountain(Vector3 position, float duration, bool finale)
         {
-            GameObject fountain = new(finale ? "Cold Spark Finale" : "Cold Spark Fountain");
+            GameObject fountain = CreateEffect(finale ? "Cold Spark Finale" : "Cold Spark Fountain");
             fountain.transform.position = position;
             fountain.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);
             ParticleSystem particles = fountain.AddComponent<ParticleSystem>();
@@ -175,7 +207,7 @@ namespace TikTokLiveGame
 
         private void CreateBurst(Vector3 position, Color color)
         {
-            GameObject burst = new("Firework Burst");
+            GameObject burst = CreateEffect("Firework Burst");
             burst.transform.position = position;
             ParticleSystem particles = burst.AddComponent<ParticleSystem>();
             ParticleSystem.MainModule main = particles.main;

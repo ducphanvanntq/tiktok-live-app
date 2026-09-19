@@ -199,6 +199,22 @@ WangnguenBrigde-Live-Windows-v<version>/
 | `F5` | Đưa TOP về góc dưới phải khi đang đặt vị trí bằng F4 |
 | `F11` | Toàn màn hình |
 
+Trong web điều khiển, mở **Live → Tùy chỉnh giao diện live** để gạt bật/tắt từng mục bên dưới. Tất cả mặc định bật; công tắc tự lưu vào `config/display.json` và áp dụng ngay cho game đang kết nối. Mở lại server hoặc game vẫn giữ lựa chọn; file cấu hình cũ tự dùng giá trị bật cho những công tắc mới.
+
+| Công tắc | Khi tắt |
+|----------|---------|
+| TOP điểm | Ẩn bảng xếp hạng; điểm vẫn tiếp tục được tính |
+| Thông báo vào sàn | Ẩn khung chào, bướm và dòng tham gia |
+| Chat người xem | Ẩn bong bóng trên nhân vật và dòng chat |
+| Dòng sự kiện | Ẩn toàn bộ các dòng sự kiện ở góc màn hình; vẫn giữ bong bóng chat |
+| Hiệu ứng quà | Dừng thông báo quà, spotlight, pháo hoa và tiếng pháo hoa, kể cả hiệu ứng Party; quà vẫn tính điểm và thực hiện hành động |
+| Focus bot | Dừng cận cảnh bot và không đưa bot vào vùng camera quét tự động |
+| Focus khi chat | Dừng lượt camera do chat thường và xóa lượt chat đang chờ; giữ focus do tham gia, quà hoặc lệnh camera |
+
+Khi bật lại, chat/lượt tham gia và hiệu ứng cũ không phát lại. Lệnh chat và hành động của nhân vật vẫn hoạt động. F3/F4 không bật lại TOP khi công tắc trên web đang tắt.
+
+Kiểm tra cấu hình: `npm test` trong `TikTokBridge`, `cargo test --manifest-path server/Cargo.toml`, và `npm run test:display-browser` (Edge trên Windows; có thể đặt `DISPLAY_BROWSER` thành đường dẫn Chromium). Đặt `RUST_SERVER_BINARY` khi chạy test Node để kiểm tra thêm giao thức của binary Rust. Game có kiểm tra offline bằng `-welcomePreviewPath <thư-mục> -displaySettingsPreview`; kết quả được ghi vào `verification.txt`.
+
 ---
 
 ## 💬 Lệnh chat người xem

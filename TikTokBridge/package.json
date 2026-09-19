@@ -9,7 +9,8 @@
     "check": "node --check server.js && node --check src/config/environment.js && node --check src/security.js && node --check src/tiktok/normalize-event.js && node --check src/tiktok/normalize-tikfinity-event.js && node --check public/control.js && node --check scripts/download-mushroom-gifs.js",
     "download:gifs": "node scripts/download-mushroom-gifs.js",
     "security:smoke": "node scripts/security-smoke.js",
-    "test": "npm run check && node --test"
+    "test": "npm run check && node --test",
+    "test:display-browser": "node scripts/check-display-browser.js"
   },
   "keywords": [],
   "author": "wangnguen-brigde <https://github.com/ducphanvanntq/tiktok-live-app>",

@@ -2,6 +2,7 @@
 
 use crate::live::demo;
 use crate::domain::event::IncomingEvent;
+use crate::domain::display::DisplayConfigMessage;
 use crate::session::pipeline::{process_game_event, save_master_config, snapshot_message, viewer_guide_message, MasterConfigMessage};
 use crate::live;
 use crate::domain::rules::{sanitize_master_config, RawMasterConfig};
@@ -207,6 +208,10 @@ async fn dispatch(
         };
         client.role = Some(role);
 
+        // Deliver visibility before the roster so reconnects do not replay hidden UI.
+        let display = *state.display.read().await;
+        send_json(sender, &DisplayConfigMessage { kind: "display_config", display }).await?;
+
         send_json(sender, &ConfigMessage {
             kind: "config",
             game: &state.game_config,
@@ -238,7 +243,7 @@ async fn dispatch(
         return send_json(sender, &error_message("Client chưa đăng ký quyền.")).await;
     };
 
-    let control_only = matches!(kind, "master_save" | "master_test");
+    let control_only = matches!(kind, "master_save" | "master_test" | "display_update");
     let operator_only = matches!(
         kind,
         "set_username" | "disconnect_tiktok" | "demo_start" | "demo_stop" | "demo_event" | "reset_game"
@@ -252,6 +257,31 @@ async fn dispatch(
     }
 
     match kind {
+        "display_update" => {
+            let mut current = state.display.write().await;
+            let next = match current.patched(message.get("patch").unwrap_or(&Value::Null)) {
+                Ok(next) => next,
+                Err(message) => return send_json(sender, &serde_json::json!({
+                    "type": "display_error", "message": message, "display": *current
+                })).await,
+            };
+            let path = state.paths.config_dir.join("display.json");
+            let temporary = state.paths.config_dir.join("display.json.tmp");
+            let saved = async {
+                let json = serde_json::to_string_pretty(&next).expect("boolean display config");
+                tokio::fs::write(&temporary, format!("{json}\n")).await?;
+                tokio::fs::rename(&temporary, &path).await
+            }.await;
+            if let Err(error) = saved {
+                tracing::error!("không lưu được display.json: {error}");
+                return send_json(sender, &serde_json::json!({
+                    "type": "display_error", "message": "Không lưu được cài đặt hiển thị. Thử lại.", "display": *current
+                })).await;
+            }
+            *current = next;
+            state.broadcast_json(&DisplayConfigMessage { kind: "display_config", display: next });
+            Ok(())
+        }
         "master_save" => {
             let raw: RawMasterConfig = message
                 .get("master")

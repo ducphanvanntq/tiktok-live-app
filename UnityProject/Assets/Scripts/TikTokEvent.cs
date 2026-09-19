@@ -36,6 +36,19 @@ namespace TikTokLiveGame
         public int pointsVersion;
         public long pointsRevision;
         public PointScoreData[] pointScores;
+        public DisplayConfig display;
+    }
+
+    [Serializable]
+    public class DisplayConfig
+    {
+        public bool showTop = true;
+        public bool showWelcome = true;
+        public bool showChat = true;
+        public bool showFeed = true;
+        public bool showGiftEffects = true;
+        public bool focusNpc = true;
+        public bool focusChat = true;
     }
 
     [Serializable]

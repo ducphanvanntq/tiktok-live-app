@@ -14,10 +14,4 @@ test('Windows launch scripts use CRLF line endings', () => {
     }
 });
 
-test('launcher checks npm exit status at execution time', () => {
-    const repositoryRoot = path.join(__dirname, '..', '..');
-    const launcher = fs.readFileSync(path.join(repositoryRoot, 'run.bat'), 'utf8');
-
-    assert.doesNotMatch(launcher, /NPM_RESULT=%ERRORLEVEL%/);
-    assert.match(launcher, /call npm ci[\s\S]*?if errorlevel 1/);
-});
+// run.bat now launches the packaged Rust server; it no longer runs npm ci.
