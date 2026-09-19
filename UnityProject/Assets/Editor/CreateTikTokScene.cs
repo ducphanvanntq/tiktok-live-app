@@ -27,6 +27,7 @@ namespace TikTokLiveGame.Editor
         [MenuItem("TikTok Live Game/Build Windows Game")]
         public static void BuildWindowsGame()
         {
+            ConfigureAppIcon();
             CreateRuntimeMaterials();
             CreateDjAnimatorController();
             EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Standalone, BuildTarget.StandaloneWindows64);
@@ -45,6 +46,7 @@ namespace TikTokLiveGame.Editor
         [MenuItem("TikTok Live Game/Build Commercial Windows Game (IL2CPP)")]
         public static void BuildCommercialWindowsGame()
         {
+            ConfigureAppIcon();
             CreateRuntimeMaterials();
             CreateDjAnimatorController();
             EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Standalone, BuildTarget.StandaloneWindows64);
@@ -54,12 +56,10 @@ namespace TikTokLiveGame.Editor
             ManagedStrippingLevel previousStripping = PlayerSettings.GetManagedStrippingLevel(target);
             bool previousStripEngineCode = PlayerSettings.stripEngineCode;
             string previousCompany = PlayerSettings.companyName;
-            string previousProduct = PlayerSettings.productName;
 
             try
             {
                 PlayerSettings.companyName = "wangnguen-brigde";
-                PlayerSettings.productName = "wangnguen-brigde Live";
                 PlayerSettings.SetScriptingBackend(target, ScriptingImplementation.IL2CPP);
                 PlayerSettings.SetManagedStrippingLevel(target, ManagedStrippingLevel.Medium);
                 PlayerSettings.stripEngineCode = true;
@@ -85,9 +85,33 @@ namespace TikTokLiveGame.Editor
                 PlayerSettings.SetManagedStrippingLevel(target, previousStripping);
                 PlayerSettings.stripEngineCode = previousStripEngineCode;
                 PlayerSettings.companyName = previousCompany;
-                PlayerSettings.productName = previousProduct;
                 AssetDatabase.SaveAssets();
             }
+        }
+
+        private static void ConfigureAppIcon()
+        {
+            const string path = "Assets/Branding/app-icon.png";
+            var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (importer == null) throw new System.InvalidOperationException("Missing app icon: " + path);
+            if (importer.mipmapEnabled || importer.alphaIsTransparency || importer.maxTextureSize != 1024 ||
+                importer.textureCompression != TextureImporterCompression.Uncompressed)
+            {
+                importer.mipmapEnabled = false;
+                // Color bleed into transparent pixels produces fringes in Windows icon exports.
+                importer.alphaIsTransparency = false;
+                importer.maxTextureSize = 1024;
+                importer.textureCompression = TextureImporterCompression.Uncompressed;
+                importer.SaveAndReimport();
+            }
+            Texture2D icon = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            foreach (NamedBuildTarget target in new[] { NamedBuildTarget.Unknown, NamedBuildTarget.Standalone })
+            {
+                int[] sizes = PlayerSettings.GetIconSizes(target, IconKind.Any);
+                if (sizes.Length == 0) throw new System.InvalidOperationException("No app icon slots for " + target.TargetName);
+                PlayerSettings.SetIcons(target, sizes.Select(_ => icon).ToArray(), IconKind.Any);
+            }
+            AssetDatabase.SaveAssets();
         }
 
         public static void DumpWindowsBuildArchitecture()
