@@ -33,14 +33,15 @@
 
 | Phần mềm | Phiên bản |
 |-----------|-----------|
-| **Windows** | 10 / 11 (64-bit) |
+| **Hệ điều hành** | Windows 10 / 11 (64-bit), hoặc macOS 12 trở lên |
 | **Rust** | Chỉ cần khi tự build source; ≥ 1.85 ([rustup](https://rustup.rs/)) |
 | **Unity** | Chỉ cần khi tự build source; dùng đúng 6000.2.10f1 |
 | **TikFinity Desktop** | Chỉ cần khi dùng `LIVE_PROVIDER=tikfinity` |
 | **OBS Studio** | Khuyến nghị cho streaming |
 
-> Gói phát hành **không cần cài gì thêm** — server là một file `.exe` đơn lẻ,
-> không còn phụ thuộc Node.js như các bản trước.
+> Gói phát hành **không cần cài gì thêm** — server là một file binary đơn lẻ,
+> không còn phụ thuộc Node.js như các bản trước. Bản macOS là Universal, chạy
+> được cả Apple silicon lẫn Intel.
 
 ---
 
@@ -68,6 +69,28 @@ Lần chạy đầu tiên launcher tự tạo `Server\.env` từ `Server\.env.ex
 
 > **Không tải “Source code (zip)” nếu bạn chỉ muốn chơi.** File source tự động của
 > GitHub không chứa thư mục `Build`; hãy tải đúng file Windows ở mục Releases.
+
+### Cách nhanh nhất trên macOS
+
+1. Tải file `WangnguenBrigde-Live-macOS-v*.zip` mới nhất ở mục [**Releases**](https://github.com/cherry9001/tiktok-live-bar/releases/latest).
+2. Giải nén toàn bộ ZIP ra một thư mục mới.
+3. Mở Terminal tại thư mục vừa giải nén, chạy **đúng một lần**:
+
+   ```bash
+   xattr -dr com.apple.quarantine .
+   ```
+
+4. Nhấp đúp `run.command`.
+
+> Bản macOS **chưa được ký số** vì dự án không có tài khoản Apple Developer, nên
+> Gatekeeper chặn lần đầu mở. Bước 3 gỡ cờ quarantine. Nếu bỏ qua bước đó, macOS
+> sẽ báo "không mở được vì chưa rõ nguồn gốc" — vào **System Settings → Privacy &
+> Security**, kéo xuống bấm **Open Anyway** rồi thử lại. Chi tiết nằm trong file
+> `DOC-TRUOC-KHI-CHAY.txt` đi kèm gói.
+
+Thả nhạc và video vào hai thư mục `DJ_MUSIC` và `DJ_VIDEO` nằm cạnh `run.command`.
+Trên macOS game đọc media từ bên trong `TikTokBarGame.app`, nên hai thư mục đó
+thực ra là symlink trỏ vào bundle — bạn không cần mở "Show Package Contents".
 
 ### Dành cho lập trình viên — Clone source
 

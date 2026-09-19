@@ -1,6 +1,6 @@
 name: Release
 
-# Day 1 tag la ra 1 ban phat hanh:
+# Day 1 tag la ra 1 ban phat hanh cho ca Windows lan macOS:
 #   git tag v1.0.5 && git push origin v1.0.5
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  windows:
     # Dung chung dung mot duong build voi CI thuong, khong chep lai cau hinh.
     uses: ./.github/workflows/build-windows.yml
     with:
@@ -18,17 +18,28 @@ jobs:
     # Job Unity can UNITY_EMAIL / UNITY_PASSWORD.
     secrets: inherit
 
+  macos:
+    uses: ./.github/workflows/build-macos.yml
+    with:
+      version: ${{ github.ref_name }}
+    secrets: inherit
+
   publish:
     name: Publish GitHub Release
-    needs: build
+    needs: [windows, macos]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      # Artifact do job `package` cua workflow duoc goi tao ra; workflow con
+      # Artifact do job `package` cua cac workflow duoc goi tao ra; workflow con
       # chay chung mot run nen tai ve duoc bang ten.
       - uses: actions/download-artifact@v4
         with:
           name: WangnguenBrigde-Live-Windows
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: WangnguenBrigde-Live-macOS
           path: dist
 
       - name: Publish
@@ -39,5 +50,17 @@ jobs:
           ls -la dist
           gh release create "$GITHUB_REF_NAME" dist/*.zip \
             --title "$GITHUB_REF_NAME" \
-            --generate-notes \
-            --verify-tag
+            --notes-file - \
+            --verify-tag <<'NOTES'
+          ## Tai ve
+
+          - **Windows 10/11 (64-bit)** — `WangnguenBrigde-Live-Windows-*.zip`
+          - **macOS** — `WangnguenBrigde-Live-macOS-*.zip` (Universal: Apple silicon + Intel)
+
+          Giai nen TOAN BO file ZIP ra mot thu muc moi roi chay `run.bat` (Windows)
+          hoac `run.command` (macOS). Khong chay truc tiep ben trong ZIP.
+
+          > Ban macOS **chua duoc ky so**. Lan dau chay, mo Terminal tai thu muc vua
+          > giai nen va chay `xattr -dr com.apple.quarantine .` — xem chi tiet trong
+          > file `DOC-TRUOC-KHI-CHAY.txt` di kem.
+          NOTES
