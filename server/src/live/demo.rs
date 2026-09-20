@@ -1,7 +1,7 @@
 //! Chế độ demo: sinh người xem giả để thử sàn nhảy khi không có live thật.
 
 use crate::domain::event::IncomingEvent;
-use crate::session::pipeline::process_game_event;
+use crate::session::pipeline::{process_game_event, process_operator_join};
 use crate::session::state::SharedState;
 use rand::Rng;
 use std::time::Duration;
@@ -12,18 +12,22 @@ const TICK_MS: u64 = 700;
 const JOIN_STAGGER_MS: u64 = 35;
 
 /// Dừng demo đang chạy (nếu có) và đợi tác vụ kết thúc hẳn.
-pub async fn stop(state: &SharedState) {
+pub async fn stop(state: &SharedState) -> bool {
+    let _event_guard = state.event_gate.lock().await;
     let handle = state.demo_task.lock().await.take();
     if let Some(handle) = handle {
         handle.abort();
         let _ = handle.await;
+        return true;
     }
+    false
 }
 
 /// Khởi động demo với `count` người xem giả.
 pub async fn start(state: SharedState, count: usize) {
     stop(&state).await;
 
+    let event_guard = state.event_gate.lock().await;
     {
         let mut session = state.session.write().await;
         session.reset("demo");
@@ -33,6 +37,7 @@ pub async fn start(state: SharedState, count: usize) {
         .await;
     state.broadcast_json(&serde_json::json!({ "type": "reset" }));
     state.broadcast_metrics().await;
+    drop(event_guard);
 
     let task_state = state.clone();
     let handle = tokio::spawn(async move {
@@ -97,7 +102,7 @@ async fn emit_member(state: &SharedState, index: usize, manual_name: Option<&str
     let mut event = IncomingEvent::new("member");
     event.event_id = demo_event_id("join");
     mock_user(&mut event, index, manual_name);
-    process_game_event(state, &event).await;
+    process_operator_join(state, &event).await;
 }
 
 /// Phát một hành động demo. Dùng cho cả nút bấm thủ công lẫn vòng lặp tự động.

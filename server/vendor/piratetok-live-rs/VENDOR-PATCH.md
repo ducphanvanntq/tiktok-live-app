@@ -91,6 +91,17 @@ dự án này chỉ dùng thư viện.
 
 Vá số 1 không chạm logic thư viện; vá số 2 có (đổi một hằng số URL).
 
+## Vá transport ngày 2026-09-20
+
+- Chuyển `Connected` từ `TikTokLiveBuilder::connect` sang `ws_event_loop`, sau khi
+  mở WebSocket và gửi các frame vào phòng. Trước đây chỉ lấy được room ID đã báo
+  connected dù handshake có thể thất bại; reconnect nội bộ cũng không báo lại
+  connected. Mỗi socket mở thành công nay phát trạng thái đúng một lần.
+- Giới hạn 15 giây cho kết nối WebSocket, gồm tunnel proxy nếu dùng. HTTP lấy room
+  ID/cookie vốn có timeout riêng; timeout mới không giới hạn độ dài phiên live.
+- Kiểm tra tại `server/tests/tiktok_transport.rs` bằng WebSocket loopback: hai lần
+  mở socket, ping/pong, frame lỗi, nguồn im lặng và phân biệt control/live-ended.
+
 ## Khi nào gỡ bỏ vendor
 
 Khi upstream phát hành bản có fix (theo dõi issue #1), đổi `Cargo.toml` của server về:

@@ -225,10 +225,6 @@ impl TikTokLiveBuilder {
 
         let (tx, rx) = mpsc::channel(256);
 
-        tx.send(TikTokLiveEvent::Connected { room_id: room_id.clone() })
-            .await
-            .map_err(|_| TikTokLiveError::ConnectionClosed)?;
-
         let handle = tokio::spawn(async move {
             let tz = system_timezone();
             let mut attempt: u32 = 0;

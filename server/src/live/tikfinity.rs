@@ -7,7 +7,7 @@ use super::Outcome;
 use crate::domain::event::IncomingEvent;
 use crate::session::pipeline::process_game_event;
 use crate::session::state::{now_ms, SharedState};
-use futures_util::StreamExt;
+use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio_tungstenite::tungstenite::Message;
@@ -17,9 +17,11 @@ static EVENT_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 pub async fn run(state: &SharedState, username: &str, failures: &mut u32) -> Outcome {
     let url = state.tikfinity_ws_url.clone();
-    let (stream, _) = match tokio_tungstenite::connect_async(&url).await {
-        Ok(pair) => pair,
-        Err(error) => return Outcome::Lost(format!("không mở được {url}: {error}")),
+    let (stream, _) = match tokio::time::timeout(std::time::Duration::from_secs(10),
+        tokio_tungstenite::connect_async(&url)).await {
+        Ok(Ok(pair)) => pair,
+        Ok(Err(error)) => return Outcome::Lost(format!("không mở được {url}: {error}")),
+        Err(_) => return Outcome::Lost("TikFinity handshake timed out".into()),
     };
 
     *failures = 0;
@@ -33,8 +35,22 @@ pub async fn run(state: &SharedState, username: &str, failures: &mut u32) -> Out
         .await;
     state.broadcast_metrics().await;
 
-    let (_, mut receiver) = stream.split();
-    while let Some(message) = receiver.next().await {
+    let (mut sender, mut receiver) = stream.split();
+    let mut heartbeat = tokio::time::interval(std::time::Duration::from_secs(30));
+    heartbeat.tick().await;
+    let mut awaiting_pong = false;
+    loop {
+        let message = tokio::select! {
+            message = receiver.next() => match message { Some(message) => message, None => break },
+            _ = heartbeat.tick() => {
+                if awaiting_pong { return Outcome::Lost("TikFinity heartbeat timed out".into()); }
+                let sent = tokio::time::timeout(std::time::Duration::from_secs(5),
+                    sender.send(Message::Ping(Vec::new().into()))).await;
+                if !matches!(sent, Ok(Ok(()))) { return Outcome::Lost("TikFinity heartbeat send failed".into()); }
+                awaiting_pong = true;
+                continue;
+            }
+        };
         let payload = match message {
             Ok(Message::Text(text)) => text.to_string(),
             Ok(Message::Binary(bytes)) => match String::from_utf8(bytes.to_vec()) {
@@ -42,6 +58,7 @@ pub async fn run(state: &SharedState, username: &str, failures: &mut u32) -> Out
                 Err(_) => continue,
             },
             Ok(Message::Close(_)) => return Outcome::Lost("TikFinity đóng kết nối".to_string()),
+            Ok(Message::Pong(_)) => { awaiting_pong = false; continue; }
             Ok(_) => continue,
             Err(error) => return Outcome::Lost(error.to_string()),
         };
@@ -82,7 +99,7 @@ fn first_number(value: &Value, keys: &[&str]) -> Option<f64> {
         match value.get(key) {
             Some(Value::Number(number)) => return number.as_f64(),
             Some(Value::String(text)) => {
-                if let Ok(number) = text.trim().parse::<f64>() {
+                if let Some(number) = text.trim().parse::<f64>().ok().filter(|n| n.is_finite()) {
                     return Some(number);
                 }
             }
@@ -246,12 +263,13 @@ fn normalize_one(raw: &Value) -> Option<IncomingEvent> {
     let mut event = IncomingEvent::new(kind);
     event.event_id = {
         let id = {
-            let from_raw = first_text(raw, &["eventId", "msgId", "id"]);
-            if from_raw.is_empty() {
-                first_text(data, &["eventId", "msgId", "id"])
-            } else {
-                from_raw
-            }
+            let explicit = first_text(raw, &["eventId", "msgId"]);
+            let nested = first_text(data, &["eventId", "msgId"]);
+            if !explicit.is_empty() { explicit }
+            else if !nested.is_empty() { nested }
+            // A bare data.id can be the viewer ID, not a message ID.
+            else if !std::ptr::eq(raw, data) { first_text(raw, &["id"]) }
+            else { String::new() }
         };
         if id.is_empty() {
             format!(
@@ -314,7 +332,7 @@ fn normalize_one(raw: &Value) -> Option<IncomingEvent> {
             event.diamond_count = first_number(data, &["totalDiamondCount", "giftValue", "totalCoins"])
                 .filter(|total| *total >= 0.0)
                 .map(|total| total as i64)
-                .unwrap_or(unit_diamonds * repeat_count);
+                .unwrap_or_else(|| unit_diamonds.saturating_mul(repeat_count));
         }
         _ => {}
     }
@@ -325,6 +343,29 @@ fn normalize_one(raw: &Value) -> Option<IncomingEvent> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_bare_viewer_id_is_not_used_as_a_deduplication_key() {
+        for payload in [r#"{"event":"like","data":{"id":"viewer","likeCount":1}}"#,
+            r#"{"event":"like","id":"viewer","likeCount":1}"#] {
+            let first = normalize_message(payload);
+            let second = normalize_message(payload);
+            assert_eq!(first[0].user_id, "viewer");
+            assert_ne!(first[0].event_id, second[0].event_id);
+        }
+        let events = normalize_message(r#"{"event":"like","id":"event-1","data":{"id":"viewer"}}"#);
+        assert_eq!(events[0].event_id, "event-1");
+    }
+
+    #[test]
+    fn oversized_gifts_do_not_overflow_before_sanitization() {
+        let events = normalize_message(r#"{"event":"gift","data":{"userId":"1","repeatCount":1e30,"diamondCount":1e30}}"#);
+        assert_eq!(events[0].diamond_count, i64::MAX);
+        let explicit = normalize_message(r#"{"event":"gift","data":{"userId":"1","repeatCount":1e30,"diamondCount":1e30,"totalCoins":12}}"#);
+        assert_eq!(explicit[0].diamond_count, 12);
+        let non_finite = normalize_message(r#"{"event":"gift","data":{"userId":"1","diamondCount":"Infinity"}}"#);
+        assert_eq!(non_finite[0].diamond_count, 0);
+    }
 
     #[test]
     fn ignores_payloads_that_are_not_json_objects() {

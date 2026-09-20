@@ -12,8 +12,11 @@ WebSocket, cùng file cấu hình, nhưng không cần Node.js và không cần 
 | Phụ thuộc | express, ws, three, tiktok-live-connector | không có `node_modules` |
 | Nguồn TikFinity | có | có (giữ làm đường lui) |
 
-Giao thức WebSocket và định dạng JSON **giữ nguyên hoàn toàn**, nên
-`public/control.html` và overlay Unity chạy được mà không phải sửa gì.
+Server dùng giao thức mà `public/control.html` và overlay Unity hiện tại hỗ trợ,
+bao gồm `display_config` và TOP điểm có `pointsVersion`, `pointsRevision`, `pointScores`.
+TOP tính 1 tim = 1 điểm, 1 kim cương quà = 100 điểm. Điểm giữ trong phiên server,
+không mất khi nhân vật hết TTL hoặc overlay kết nối lại; reset/đổi nguồn/khởi động
+lại server bắt đầu bảng điểm mới.
 
 ## Chạy
 
@@ -101,13 +104,39 @@ bê nguyên sang chỉ thêm tầng thư mục mà không được gì. Cách x�
 ## Kiểm thử
 
 ```bash
-cargo test      # 78 test, gồm 6 test chạy trên chính file config/ thật
-cargo clippy --all-targets
+cargo test --locked
+cargo clippy --all-targets --locked
 ```
 
 `tests/real_config.rs` là chốt chặn quan trọng nhất: nó kiểm tra `master.json` và
 `observed-gifts.json` round-trip qua Rust mà không đổi tên khoá hay mất dữ liệu.
 Nếu test này đỏ, bản Node sẽ đọc hỏng file do bản Rust ghi ra.
+
+Kiểm tra giao thức với server Rust thực thi (PowerShell, chạy từ gốc repo):
+
+```powershell
+cargo build --locked --manifest-path server/Cargo.toml
+$env:RUST_SERVER_BINARY = (Resolve-Path server/target/debug/tiktok-server.exe).Path
+npm --prefix TikTokBridge test
+```
+
+Test Rust qua WebSocket được bỏ qua nếu không đặt `RUST_SERVER_BINARY`. Bộ test
+lifecycle mất khoảng 75 giây vì thử cả timeout heartbeat thật. Dữ liệu thử dùng
+cổng ngẫu nhiên và thư mục config tạm, không điều khiển server đang phát live.
+Phạm vi kiểm chứng và giới hạn: [livestream-audit.md](docs/livestream-audit.md).
+
+Kiểm tra tùy chọn với tài khoản đang live thật (không chạy tự động trong `npm test`):
+
+```powershell
+node TikTokBridge/scripts/check-rust-live.js USERNAME 180
+node TikTokBridge/scripts/check-rust-live.js OFFLINE_USERNAME 30 --expect-offline
+```
+
+Script tạo server/config riêng và lưu báo cáo trong `UnityProject/Logs/real-live-*`.
+Nó so TOP với bộ tính điểm Node theo từng sự kiện, kiểm tra snapshot khi overlay
+kết nối lại, ngắt live rồi mở lại qua lệnh operator. Script chỉ nhận sự kiện,
+không gửi chat/tim/quà tới chủ phòng. Loại sự kiện không xuất hiện được liệt kê
+trong `unobservedEvents`; kết quả PASS không có nghĩa mọi loại quà đã xuất hiện.
 
 ## Lưu ý khi build trên Windows
 

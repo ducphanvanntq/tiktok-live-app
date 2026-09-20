@@ -4,6 +4,7 @@
 //! không cần dựng server hay mock. Mọi thứ ở đây nhận vào dữ liệu và trả ra dữ liệu.
 
 pub mod event;
+pub mod points;
 pub mod display;
 pub mod gifts;
 pub mod rules;

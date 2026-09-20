@@ -17,7 +17,7 @@ use tiktok_server::session::state::{AppState, ConnectionStatus, Session, SharedS
 use tiktok_server::transport::http;
 use tokio::sync::{broadcast, RwLock};
 
-/// Sức chứa kênh broadcast. Client chậm hơn mức này sẽ bị bỏ bớt message thay vì chặn server.
+/// Sức chứa kênh broadcast. Client chậm hơn mức này phải reconnect để lấy snapshot.
 const BROADCAST_CAPACITY: usize = 1024;
 /// Khoảng gom nhóm trước khi ghi `observed-gifts.json`.
 const OBSERVED_SAVE_DEBOUNCE_MS: u64 = 250;
@@ -60,23 +60,31 @@ async fn main() -> ExitCode {
         }
     };
 
-    spawn_observed_gift_saver(state.clone());
+    let (gift_saver, stop_gift_saver) = spawn_observed_gift_saver(state.clone());
 
     println!("TikTok Live Game: http://{host}:{port}");
     println!("Bảng điều khiển: http://{host}:{port}/control.html");
 
+    let shutdown_state = state.clone();
     let serve = axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
-    .with_graceful_shutdown(shutdown_signal());
+    .with_graceful_shutdown(async move {
+        shutdown_signal().await;
+        shutdown_state.shutdown.send_replace(true);
+    });
 
     if let Err(error) = serve.await {
         eprintln!("Lỗi server: {error}");
         return ExitCode::FAILURE;
     }
 
-    // Ghi nốt thư viện gift trước khi thoát.
+    tiktok_server::live::disconnect(&state).await;
+    tiktok_server::live::demo::stop(&state).await;
+    let _ = stop_gift_saver.send(());
+    let _ = gift_saver.await;
+    // Ghi nốt thư viện gift trước khi thoát, sau khi dừng các tác vụ có thể ghi.
     if let Err(error) = save_observed_gifts(&state).await {
         eprintln!("Không lưu được thư viện gift lúc thoát: {error}");
     }
@@ -190,6 +198,9 @@ async fn build_state(root: &Path) -> Result<SharedState, String> {
         observed_dirty: Default::default(),
         demo_task: Default::default(),
         live_task: Default::default(),
+        operator_gate: Default::default(),
+        event_gate: Default::default(),
+        shutdown: tokio::sync::watch::channel(false).0,
     }))
 }
 
@@ -203,16 +214,24 @@ async fn read_json(path: &Path) -> Result<serde_json::Value, String> {
 
 /// Gom nhóm các lần ghi `observed-gifts.json`: một phiên live đông có thể học
 /// hàng chục quà mỗi phút, ghi ngay mỗi lần sẽ quần đĩa vô ích.
-fn spawn_observed_gift_saver(state: SharedState) {
-    tokio::spawn(async move {
+fn spawn_observed_gift_saver(state: SharedState) -> (tokio::task::JoinHandle<()>, tokio::sync::oneshot::Sender<()>) {
+    let (stop, mut stopped) = tokio::sync::oneshot::channel();
+    let task = tokio::spawn(async move {
         loop {
-            state.observed_dirty.notified().await;
-            tokio::time::sleep(Duration::from_millis(OBSERVED_SAVE_DEBOUNCE_MS)).await;
+            tokio::select! {
+                _ = &mut stopped => break,
+                _ = state.observed_dirty.notified() => {}
+            }
+            tokio::select! {
+                _ = &mut stopped => break,
+                _ = tokio::time::sleep(Duration::from_millis(OBSERVED_SAVE_DEBOUNCE_MS)) => {}
+            }
             if let Err(error) = save_observed_gifts(&state).await {
                 tracing::error!("không lưu được thư viện gift: {error}");
             }
         }
     });
+    (task, stop)
 }
 
 fn report_bind_error(error: &std::io::Error, port: u16) {
@@ -222,7 +241,7 @@ fn report_bind_error(error: &std::io::Error, port: u16) {
         eprintln!("   Cách khắc phục:");
         eprintln!("   1. Tắt cửa sổ cmd/terminal cũ đang chạy server");
         eprintln!("   2. Hoặc đổi PORT trong file .env");
-        eprintln!("      Bản game dựng sẵn cần PORT=3000.\n");
+        eprintln!("      Bản game dựng sẵn cần PORT=8085.\n");
     } else {
         eprintln!("Lỗi server: {error}");
     }

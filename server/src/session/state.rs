@@ -77,6 +77,7 @@ pub struct Session {
     pub metrics: Metrics,
     pub players: BTreeMap<String, PlayerState>,
     pub vip_scores: BTreeMap<String, VipScore>,
+    pub points: crate::domain::points::PointsLeaderboard,
     dedupe: BTreeMap<String, i64>,
 }
 
@@ -93,6 +94,7 @@ impl Session {
         self.metrics = Metrics::fresh(source);
         self.players.clear();
         self.vip_scores.clear();
+        self.points = Default::default();
         self.dedupe.clear();
     }
 
@@ -197,6 +199,11 @@ pub struct AppState {
     pub demo_task: Mutex<Option<JoinHandle<()>>>,
     /// Tác vụ đang giữ kết nối live (TikTok hoặc TikFinity).
     pub live_task: Mutex<Option<JoinHandle<()>>>,
+    /// Serialize source changes from multiple control clients.
+    pub operator_gate: Mutex<()>,
+    /// Keep each event and reset ordered through state updates and broadcasts.
+    pub event_gate: Mutex<()>,
+    pub shutdown: tokio::sync::watch::Sender<bool>,
 }
 
 pub type SharedState = Arc<AppState>;

@@ -82,6 +82,8 @@ pub struct GameEvent {
     pub firework_bursts: i64,
     pub master_rule_id: String,
     pub joined_now: bool,
+    #[serde(flatten, default, skip_serializing_if = "Option::is_none")]
+    pub points: Option<super::points::PointsSnapshot>,
 }
 
 impl GameEvent {

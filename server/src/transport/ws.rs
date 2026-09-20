@@ -87,12 +87,14 @@ pub async fn upgrade(
     }
 
     let native = origin.is_empty() && is_loopback_address(&remote_ip);
-    ws.on_upgrade(move |socket| handle(socket, state, native))
+    ws.max_message_size(64 * 1024).max_frame_size(64 * 1024)
+        .on_upgrade(move |socket| handle(socket, state, native))
 }
 
 async fn handle(socket: WebSocket, state: SharedState, native: bool) {
     let (mut sender, mut receiver) = socket.split();
     let mut broadcast_rx = state.broadcast.subscribe();
+    let mut shutdown = state.shutdown.subscribe();
 
     // Gửi trạng thái ngay khi mở, trước cả khi client đăng ký vai trò.
     {
@@ -113,29 +115,34 @@ async fn handle(socket: WebSocket, state: SharedState, native: bool) {
     };
     let mut heartbeat = tokio::time::interval(std::time::Duration::from_secs(HEARTBEAT_SECS));
     heartbeat.tick().await; // bỏ nhịp đầu (kích hoạt ngay lập tức)
+    let mut awaiting_pong = false;
 
     loop {
+        if *shutdown.borrow() { break; }
         tokio::select! {
+            _ = shutdown.changed() => break,
             // Message phát cho mọi client.
             payload = broadcast_rx.recv() => {
                 match payload {
                     Ok(payload) => {
-                        if sender.send(Message::Text(payload.into())).await.is_err() {
+                        if send_message(&mut sender, Message::Text(payload.into())).await.is_err() {
                             break;
                         }
                     }
-                    // Client đọc quá chậm: bỏ qua phần trễ thay vì đóng kết nối.
+                    // Reconnect forces a fresh snapshot after state messages were lost.
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
-                        tracing::warn!("client chậm, bỏ qua {skipped} message");
+                        tracing::warn!("client chậm, kết nối lại để đồng bộ {skipped} message bị lỡ");
+                        break;
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                 }
             }
 
             _ = heartbeat.tick() => {
-                if sender.send(Message::Ping(Vec::new().into())).await.is_err() {
+                if awaiting_pong || send_message(&mut sender, Message::Ping(Vec::new().into())).await.is_err() {
                     break;
                 }
+                awaiting_pong = true;
             }
 
             incoming = receiver.next() => {
@@ -144,6 +151,7 @@ async fn handle(socket: WebSocket, state: SharedState, native: bool) {
                     Message::Text(text) => text,
                     Message::Binary(_) => break, // chỉ nhận text
                     Message::Close(_) => break,
+                    Message::Pong(_) => { awaiting_pong = false; continue; }
                     _ => continue, // Ping/Pong do tầng dưới xử lý
                 };
 
@@ -178,11 +186,16 @@ async fn handle(socket: WebSocket, state: SharedState, native: bool) {
 
 type Sender = futures_util::stream::SplitSink<WebSocket, Message>;
 
+async fn send_message(sender: &mut Sender, message: Message) -> Result<(), ()> {
+    tokio::time::timeout(std::time::Duration::from_secs(10), sender.send(message))
+        .await.map_err(|_| ())?.map_err(|_| ())
+}
+
 async fn send_json<T: Serialize>(sender: &mut Sender, message: &T) -> Result<(), ()> {
     let payload = serde_json::to_string(message).map_err(|error| {
         tracing::error!("không serialize được message: {error}");
     })?;
-    sender.send(Message::Text(payload.into())).await.map_err(|_| ())
+    send_message(sender, Message::Text(payload.into())).await
 }
 
 /// Xử lý một lệnh từ client. `Err` nghĩa là phải đóng kết nối.
@@ -256,6 +269,10 @@ async fn dispatch(
         return send_json(sender, &error_message("Client không có quyền điều khiển.")).await;
     }
 
+    let _operator_guard = if operator_only {
+        Some(state.operator_gate.lock().await)
+    } else { None };
+
     match kind {
         "display_update" => {
             let mut current = state.display.write().await;
@@ -283,19 +300,24 @@ async fn dispatch(
             Ok(())
         }
         "master_save" => {
-            let raw: RawMasterConfig = message
+            let raw: Option<RawMasterConfig> = message
                 .get("master")
                 .cloned()
-                .and_then(|value| serde_json::from_value(value).ok())
-                .unwrap_or_default();
+                .filter(Value::is_object)
+                .and_then(|value| serde_json::from_value(value).ok());
+            let Some(raw) = raw else {
+                return send_json(sender, &error_message("Dữ liệu Master không hợp lệ.")).await;
+            };
             let master = sanitize_master_config(&raw);
-            *state.master.write().await = master.clone();
+            let mut current = state.master.write().await;
 
             if let Err(error) = save_master_config(state, &master).await {
                 tracing::error!("không lưu được master.json: {error}");
                 return send_json(sender, &error_message("Không thể ghi file Master.")).await;
             }
+            *current = master.clone();
             state.broadcast_json(&MasterConfigMessage { kind: "master_config", master });
+            drop(current);
             let guide = viewer_guide_message(state).await;
             state.broadcast_json(&guide);
             send_json(sender, &MasterSavedMessage {
@@ -361,7 +383,9 @@ async fn dispatch(
 
         "disconnect_tiktok" => {
             live::disconnect(state).await;
-            state.set_status("idle", None, "Đã ngắt kết nối").await;
+            if state.status.read().await.state != "demo" {
+                state.set_status("idle", None, "Đã ngắt kết nối").await;
+            }
             Ok(())
         }
 
@@ -374,8 +398,9 @@ async fn dispatch(
         }
 
         "demo_stop" => {
-            demo::stop(state).await;
-            state.set_status("idle", None, "Đã dừng demo").await;
+            if demo::stop(state).await {
+                state.set_status("idle", None, "Đã dừng demo").await;
+            }
             Ok(())
         }
 
@@ -393,6 +418,7 @@ async fn dispatch(
         }
 
         "reset_game" => {
+            let _event_guard = state.event_gate.lock().await;
             {
                 let mut session = state.session.write().await;
                 let source = session.metrics.source.clone();

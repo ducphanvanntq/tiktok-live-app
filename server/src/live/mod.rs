@@ -33,6 +33,8 @@ pub fn normalize_username(value: &str) -> Option<String> {
 
 /// Ngắt kết nối live hiện tại và đợi tác vụ dừng hẳn.
 pub async fn disconnect(state: &SharedState) {
+    // Finish any event/config write before cancelling the provider task.
+    let _event_guard = state.event_gate.lock().await;
     let handle = state.live_task.lock().await.take();
     if let Some(handle) = handle {
         handle.abort();
@@ -45,12 +47,14 @@ pub async fn connect(state: SharedState, username: String) {
     disconnect(&state).await;
     demo::stop(&state).await;
 
+    let event_guard = state.event_gate.lock().await;
     {
         let mut session = state.session.write().await;
         session.reset("tiktok");
     }
     state.broadcast_json(&serde_json::json!({ "type": "reset" }));
     state.broadcast_metrics().await;
+    drop(event_guard);
 
     let task_state = state.clone();
     let handle = tokio::spawn(async move { run_with_reconnect(task_state, username).await });

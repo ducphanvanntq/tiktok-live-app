@@ -4,6 +4,8 @@ const { spawn } = require('node:child_process');
 const { once } = require('node:events');
 const net = require('node:net');
 const path = require('node:path');
+const fs = require('node:fs/promises');
+const os = require('node:os');
 const WebSocket = require('ws');
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -18,12 +20,19 @@ async function until(predicate) {
     throw new Error('Timed out waiting for points protocol');
 }
 
-test('wire: accepted likes, combo dedupe, reconnect snapshot and reset preserve correct totals', { timeout: 18000 }, async () => {
+for (const kind of ['node', 'rust']) test(`${kind}: accepted likes, combo dedupe, reconnect snapshot and reset preserve correct totals`,
+    { timeout: 25000, skip: kind === 'rust' && !process.env.RUST_SERVER_BINARY }, async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'tiktok-points-wire-'));
+    for (const name of ['game.json', 'gifts.json', 'master.json', 'observed-gifts.json', 'display.json']) {
+        await fs.copyFile(path.join(__dirname, '..', 'config', name), path.join(directory, name));
+    }
     const port = await freePort();
     const source = new WebSocket.Server({ host: '127.0.0.1', port: 0 });
     await once(source, 'listening');
-    const bridge = spawn(process.execPath, ['server.js'], { cwd: path.join(__dirname, '..'), windowsHide: true,
+    const bridge = spawn(kind === 'node' ? process.execPath : process.env.RUST_SERVER_BINARY,
+        kind === 'node' ? ['server.js'] : [], { cwd: path.join(__dirname, '..'), windowsHide: true,
         env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', ALLOW_LAN: '0', LIVE_PROVIDER: 'tikfinity',
+            CONFIG_DIR: directory, DISPLAY_CONFIG_PATH: path.join(directory, 'display.json'),
             TIKFINITY_WS_URL: `ws://127.0.0.1:${source.address().port}/`, LOG_TIKTOK_EVENTS: '0' }, stdio: 'pipe' });
     let log = '';
     bridge.stdout.on('data', data => { log += data; });
@@ -94,5 +103,6 @@ test('wire: accepted likes, combo dedupe, reconnect snapshot and reset preserve 
         for (const client of source.clients) client.terminate();
         await new Promise(resolve => source.close(resolve));
         if (bridge.exitCode === null) { bridge.kill(); await once(bridge, 'exit'); }
+        await fs.rm(directory, { recursive: true, force: true });
     }
 });

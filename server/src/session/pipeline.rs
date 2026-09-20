@@ -15,6 +15,19 @@ const GUIDE_ACTION_ORDER: [&str; 5] = ["walk", "medal", "fireworks", "grow", "to
 
 /// Nhận một sự kiện thô, áp toàn bộ luật rồi phát đi.
 pub async fn process_game_event(state: &SharedState, input: &IncomingEvent) {
+    process_event(state, input, false).await;
+}
+
+/// Only the local operator/demo path can explicitly add a floor member.
+pub async fn process_operator_join(state: &SharedState, input: &IncomingEvent) {
+    process_event(state, input, true).await;
+}
+
+async fn process_event(state: &SharedState, input: &IncomingEvent, operator_join: bool) {
+    if input.kind == "gift" && input.is_pending_gift_streak() {
+        return;
+    }
+    let _event_guard = state.event_gate.lock().await;
     let Some(mut event) = sanitize_game_event(input) else {
         return;
     };
@@ -25,13 +38,17 @@ pub async fn process_game_event(state: &SharedState, input: &IncomingEvent) {
         apply_rule(&mut event, rule.as_ref());
     }
     apply_built_in_chat_command(&mut event);
+    if operator_join && event.is("member") {
+        event.action = "join".into();
+    }
 
     let is_known_player = {
-        let session = state.session.read().await;
+        let mut session = state.session.write().await;
+        session.prune_players(now_ms(), state.player_ttl_ms, state.max_players);
         !event.user_id.is_empty() && session.players.contains_key(&event.user_id)
     };
 
-    let joins_by_keyword = event.is("chat") && event.action == "join";
+    let joins_by_keyword = (event.is("chat") || event.is("member")) && event.action == "join";
     let joins_by_social = event.is("follow") || event.is("share");
     event.joined_now = (joins_by_keyword || joins_by_social) && !is_known_player;
 
@@ -46,6 +63,10 @@ pub async fn process_game_event(state: &SharedState, input: &IncomingEvent) {
         }
     }
 
+    // Dedupe before learning gifts or writing config, including replayed frames.
+    if !emit_game_event(state, event.clone()).await {
+        return;
+    }
     if event.is("gift") && is_real_observed_gift(&event) {
         learn_observed_gift(state, &event).await;
         let unit = if event.unit_diamond_count > 0 {
@@ -61,18 +82,16 @@ pub async fn process_game_event(state: &SharedState, input: &IncomingEvent) {
             gift_picture_url: event.gift_picture_url.clone(),
         });
     }
-
-    emit_game_event(state, event).await;
 }
 
 /// Khử trùng lặp, gắn hiệu ứng theo bảng quà, cập nhật người chơi và chỉ số, rồi phát.
-async fn emit_game_event(state: &SharedState, mut event: GameEvent) {
+async fn emit_game_event(state: &SharedState, mut event: GameEvent) -> bool {
     let now = now_ms();
 
     {
         let mut session = state.session.write().await;
         if session.is_duplicate(&event, now) {
-            return;
+            return false;
         }
     }
 
@@ -140,10 +159,13 @@ async fn emit_game_event(state: &SharedState, mut event: GameEvent) {
             }
             _ => {}
         }
+        if session.points.apply(&event) {
+            event.points = Some(session.points.snapshot());
+        }
+        state.broadcast_json(&event);
     }
-
-    state.broadcast_json(&event);
     state.broadcast_metrics().await;
+    true
 }
 
 /// Giá trị đầu tiên không rỗng, theo thứ tự ưu tiên.
@@ -183,7 +205,8 @@ async fn learn_observed_gift(state: &SharedState, event: &GameEvent) {
     // khớp được kể cả khi TikTok đổi tên hiển thị theo ngôn ngữ người xem.
     let mut master_changed = false;
     if !gift_id.is_empty() {
-        let mut master = state.master.write().await;
+        let mut current = state.master.write().await;
+        let mut master = current.clone();
         let learned_name = normalize_text(&learned.gift_name);
         for rule in master.rules.iter_mut() {
             if rule.source != "gift" || !rule.gift_id.is_empty() {
@@ -199,17 +222,15 @@ async fn learn_observed_gift(state: &SharedState, event: &GameEvent) {
             master_changed = true;
             break;
         }
-    }
-
-    if master_changed {
-        let master = state.master.read().await.clone();
-        if let Err(error) = save_master_config(state, &master).await {
-            tracing::error!("không lưu được Gift ID vào Master: {error}");
+        if master_changed {
+            match save_master_config(state, &master).await {
+                Ok(()) => {
+                    *current = master.clone();
+                    state.broadcast_json(&MasterConfigMessage { kind: "master_config", master });
+                }
+                Err(error) => tracing::error!("không lưu được Gift ID vào Master: {error}"),
+            }
         }
-        state.broadcast_json(&MasterConfigMessage {
-            kind: "master_config",
-            master,
-        });
     }
 
     state.mark_observed_gifts_dirty();
@@ -226,7 +247,9 @@ pub async fn save_master_config(
 ) -> std::io::Result<()> {
     let mut json = serde_json::to_string_pretty(master)?;
     json.push('\n');
-    tokio::fs::write(state.paths.master_config(), json).await
+    let temporary = state.paths.config_dir.join("master.json.tmp");
+    tokio::fs::write(&temporary, json).await?;
+    tokio::fs::rename(temporary, state.paths.master_config()).await
 }
 
 /// Ghi `config/observed-gifts.json`.
@@ -234,7 +257,9 @@ pub async fn save_observed_gifts(state: &SharedState) -> std::io::Result<()> {
     let gifts: Vec<ObservedGift> = state.observed_gifts.read().await.values().cloned().collect();
     let mut json = serde_json::to_string_pretty(&gifts)?;
     json.push('\n');
-    tokio::fs::write(state.paths.observed_gifts(), json).await
+    let temporary = state.paths.config_dir.join("observed-gifts.json.tmp");
+    tokio::fs::write(&temporary, json).await?;
+    tokio::fs::rename(temporary, state.paths.observed_gifts()).await
 }
 
 /// Bảng hướng dẫn hiển thị trên overlay: lệnh tham gia và các quà đáng chú ý.
@@ -329,6 +354,7 @@ pub async fn snapshot_message(state: &SharedState) -> SnapshotMessage {
         kind: "snapshot",
         players: session.players.values().cloned().collect(),
         vip_scores: session.vip_scores.values().cloned().collect(),
+        points: session.points.snapshot(),
     }
 }
 
@@ -379,4 +405,6 @@ pub struct SnapshotMessage {
     pub kind: &'static str,
     pub players: Vec<PlayerState>,
     pub vip_scores: Vec<VipScore>,
+    #[serde(flatten)]
+    pub points: crate::domain::points::PointsSnapshot,
 }

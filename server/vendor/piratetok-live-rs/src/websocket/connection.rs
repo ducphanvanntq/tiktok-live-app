@@ -41,14 +41,15 @@ pub async fn run_websocket(ws_url: &str, cookies: &str, user_agent: &str, room_i
         .map_err(|e| TikTokLiveError::invalid(format!("ws request build: {e}")))?;
 
     if let Some(proxy_url) = proxy {
-        let tunnel = connect_proxy_tunnel(proxy_url, &host).await?;
-        let (ws_stream, _) = handle_ws_handshake(
-            tokio_tungstenite::client_async_tls_with_config(request, tunnel, None, None).await
-        )?;
+        let (ws_stream, _) = tokio::time::timeout(Duration::from_secs(15), async {
+            let tunnel = connect_proxy_tunnel(proxy_url, &host).await?;
+            handle_ws_handshake(tokio_tungstenite::client_async_tls_with_config(request, tunnel, None, None).await)
+        }).await.map_err(|_| TikTokLiveError::invalid("websocket connect timed out"))??;
         ws_event_loop(ws_stream, room_id, heartbeat_interval, stale_timeout, tx).await
     } else {
         let (ws_stream, _) = handle_ws_handshake(
-            tokio_tungstenite::connect_async(request).await
+            tokio::time::timeout(Duration::from_secs(15), tokio_tungstenite::connect_async(request))
+                .await.map_err(|_| TikTokLiveError::invalid("websocket connect timed out"))?
         )?;
         ws_event_loop(ws_stream, room_id, heartbeat_interval, stale_timeout, tx).await
     }
@@ -89,6 +90,8 @@ where
 
     let enter_bytes = build_enter_room(room_id)?;
     write.send(WsMessage::Binary(enter_bytes.into())).await?;
+    tx.send(TikTokLiveEvent::Connected { room_id: room_id.to_string() }).await
+        .map_err(|_| TikTokLiveError::ConnectionClosed)?;
 
     let mut heartbeat_tick = interval(heartbeat_interval);
     heartbeat_tick.tick().await; // skip first immediate tick

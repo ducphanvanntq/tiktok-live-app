@@ -179,6 +179,9 @@ mod tests {
             observed_dirty: Default::default(),
             demo_task: Default::default(),
             live_task: Default::default(),
+            operator_gate: Default::default(),
+            event_gate: Default::default(),
+            shutdown: tokio::sync::watch::channel(false).0,
         })
     }
 
