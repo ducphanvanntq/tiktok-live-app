@@ -58,7 +58,7 @@ namespace TikTokLiveGame
             baseEndWidth = wash ? 0.92f : beamStyle ? 0.095f : gobo ? 0.22f : 0.24f;
             beam.startWidth = baseStartWidth;
             beam.endWidth = baseEndWidth;
-            beam.sharedMaterial = GameMaterials.BackgroundSprite();
+            beam.sharedMaterial = new Material(Resources.Load<Shader>("Shaders/StageBeam"));
             beam.startColor = new Color(color.r, color.g, color.b, wash ? 0.045f : beamStyle ? 0.17f : gobo ? 0.1f : 0.12f);
             beam.endColor = new Color(color.r, color.g, color.b, 0.008f);
             beam.enabled = true;
@@ -80,22 +80,27 @@ namespace TikTokLiveGame
                 Mathf.Lerp(-3.5f, 4.2f, Mathf.Sin(time * (speed * 0.81f) + phase * 1.23f) * 0.5f + 0.5f)
             );
 
-            if (wash)
-            {
-                beam.startColor = new Color(baseColor.r, baseColor.g, baseColor.b, 0.055f);
-                beam.endColor = new Color(baseColor.r, baseColor.g, baseColor.b, 0.008f);
-            }
+            LightingConfig lighting = StageLighting.Current;
+            baseColor = StageLighting.PaletteColor(lighting.lightsPalette, phase * 0.19f);
+            beam.startColor = new Color(baseColor.r, baseColor.g, baseColor.b, 0.42f * lighting.lightsBrightness);
+            beam.endColor = new Color(baseColor.r, baseColor.g, baseColor.b, 0.06f * lighting.lightsBrightness);
             spot.color = baseColor;
             float baseIntensity = wash ? 0.62f : beamStyle ? 2.7f : gobo ? 2.15f : 1.9f;
             float pulseIntensity = wash ? 0.42f : beamStyle ? 1.35f : gobo ? 1.05f : 0.9f;
-            spot.intensity = baseIntensity + beatPulse * pulseIntensity;
+            spot.intensity = (baseIntensity + beatPulse * pulseIntensity) * lighting.lightsBrightness;
+            spot.spotAngle = Mathf.Min(100f, (wash ? 24f : beamStyle ? 7f : gobo ? 17f : 13f) * lighting.beamWidth);
             transform.position = origin;
             transform.LookAt(target);
             if (gobo) transform.Rotate(Vector3.forward, time * (style == MovingHeadStyle.GoboStar ? 21f : -15f) + phase * 18f, Space.Self);
-            beam.startWidth = baseStartWidth * (0.82f + beatPulse * 0.45f);
-            beam.endWidth = baseEndWidth * (0.82f + beatPulse * 0.45f);
+            beam.startWidth = baseStartWidth * lighting.beamWidth * (0.82f + beatPulse * 0.45f);
+            beam.endWidth = Mathf.Max(baseEndWidth, 0.55f) * lighting.beamWidth * (0.82f + beatPulse * 0.45f);
             beam.SetPosition(0, origin);
             beam.SetPosition(1, target);
+        }
+
+        private void OnDestroy()
+        {
+            if (beam != null && beam.sharedMaterial != null) Destroy(beam.sharedMaterial);
         }
 
         private static Texture2D CookieForStyle(MovingHeadStyle fixtureStyle)

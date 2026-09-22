@@ -42,6 +42,7 @@ namespace TikTokLiveGame
     [Serializable]
     public class DisplayConfig
     {
+        public LightingConfig lighting = new();
         public bool showTop = true;
         public bool showWelcome = true;
         public bool showChat = true;

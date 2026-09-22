@@ -81,6 +81,7 @@ namespace TikTokLiveGame
                 if (liveEvent.display == null) return;
                 if (displayConfig.showTop != liveEvent.display.showTop) hudVisible = liveEvent.display.showTop;
                 displayConfig = liveEvent.display;
+                FindFirstObjectByType<StageLighting>()?.Configure(displayConfig.lighting);
                 if (!displayConfig.showTop && topPoints.IsPositioning) topPoints.TogglePositioning();
                 welcomeToast.SetDisplayEnabled(displayConfig.showWelcome);
                 chatBubbles.SetDisplayEnabled(displayConfig.showChat);
@@ -313,6 +314,7 @@ namespace TikTokLiveGame
         private void ToggleChroma()
         {
             chromaMode = !chromaMode;
+            FindFirstObjectByType<StageLighting>()?.SetChroma(chromaMode);
             if (environmentRenderers.Count == 0)
             {
                 foreach (Renderer renderer in FindObjectsByType<Renderer>(FindObjectsSortMode.None))

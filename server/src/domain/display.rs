@@ -4,6 +4,7 @@ use serde_json::Value;
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct DisplayConfig {
+    pub lighting: super::lighting::LightingConfig,
     pub show_top: bool,
     pub show_welcome: bool,
     pub show_chat: bool,
@@ -15,7 +16,7 @@ pub struct DisplayConfig {
 
 impl Default for DisplayConfig {
     fn default() -> Self {
-        Self { show_top: true, show_welcome: true, show_chat: true,
+        Self { lighting: Default::default(), show_top: true, show_welcome: true, show_chat: true,
             show_feed: true, show_gift_effects: true, focus_npc: true, focus_chat: true }
     }
 }
@@ -27,6 +28,10 @@ impl DisplayConfig {
             .ok_or("Cấu hình hiển thị không hợp lệ.")?;
         let mut next = self;
         for (key, value) in fields {
+            if key == "lighting" {
+                next.lighting = next.lighting.patched(value)?;
+                continue;
+            }
             let enabled = value.as_bool().ok_or("Công tắc phải là true hoặc false.")?;
             match key.as_str() {
                 "showTop" => next.show_top = enabled,
@@ -66,7 +71,7 @@ mod tests {
         for key in ["showTop", "showWelcome", "showChat", "showFeed", "showGiftEffects", "focusNpc", "focusChat"] {
             disabled = disabled.patched(&json!({(key): false})).unwrap();
         }
-        assert!(serde_json::to_value(disabled).unwrap().as_object().unwrap().values().all(|value| value == false));
+        assert!(serde_json::to_value(disabled).unwrap().as_object().unwrap().iter().filter(|(key, _)| *key != "lighting").all(|(_, value)| value == false));
     }
 
     #[test]

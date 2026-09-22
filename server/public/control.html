@@ -18,6 +18,7 @@
     </div>
     <div class="tab-nav">
         <button class="tab-btn active" data-tab="live">🔴 Live</button>
+        <button class="tab-btn" data-tab="lighting">✨ Sân khấu & đèn</button>
         <button class="tab-btn" data-tab="rules">⚙️ Master Rules</button>
         <button class="tab-btn" data-tab="testlab">🧪 Test Lab</button>
         <button class="tab-btn" data-tab="events">🎯 Events</button>
@@ -137,6 +138,34 @@
             <span><strong>Focus khi chat</strong><small>Camera ưu tiên người đang chat. Tắt vẫn giữ focus do tham gia, quà hoặc lệnh camera.</small></span>
         </label>
         <p id="display-message" class="help" role="status" aria-live="polite">Đang tải cài đặt…</p>
+    </div>
+</section>
+
+<section class="tab-panel" id="tab-lighting">
+    <div class="page-header"><p class="page-eyebrow">Lighting studio</p><h1 class="page-title">Sân khấu & đèn</h1><p class="page-desc">Đổi màu cả căn phòng. Chỉnh trực tiếp trong Unity, tự lưu cho lần mở sau.</p></div>
+    <div class="grid-2">
+        <div class="card">
+            <div class="card-header"><h2 class="card-title">Sàn LED</h2></div>
+            <label class="toggle-wrap display-switch"><input type="checkbox" data-lighting="floorEnabled" role="switch" disabled><span class="toggle-track" aria-hidden="true"></span><span><strong>Bật sàn LED</strong><small>Ẩn / hiện mặt sàn phát sáng</small></span></label>
+            <label class="lighting-field">Phối màu<select data-lighting="floorPalette" disabled></select></label>
+            <label class="lighting-field">Hiệu ứng<select data-lighting="floorPattern" disabled><option value="0">Làn sóng</option><option value="1">Ô cờ</option><option value="2">Lan tỏa</option></select></label>
+            <label class="lighting-field">Độ sáng <output data-lighting-output="floorBrightness"></output><input type="range" min="0" max="2" step="0.05" data-lighting="floorBrightness" disabled></label>
+        </div>
+        <div class="card">
+            <div class="card-header"><h2 class="card-title">Nền sân khấu</h2></div>
+            <label class="toggle-wrap display-switch"><input type="checkbox" data-lighting="backgroundEnabled" role="switch" disabled><span class="toggle-track" aria-hidden="true"></span><span><strong>Bật nền</strong><small>Tường nền và trần của căn phòng</small></span></label>
+            <label class="lighting-field">Phối màu<select data-lighting="backgroundPalette" disabled></select></label>
+            <label class="lighting-field">Độ sáng <output data-lighting-output="backgroundBrightness"></output><input type="range" min="0" max="2" step="0.05" data-lighting="backgroundBrightness" disabled></label>
+            <p class="help">Giữ hình nền và chữ hiện tại, phối lại màu ánh sáng. Chọn “Màu ảnh gốc” để trở về màu nguyên bản.</p>
+        </div>
+        <div class="card">
+            <div class="card-header"><h2 class="card-title">Đèn chiếu sân khấu</h2></div>
+            <label class="toggle-wrap display-switch"><input type="checkbox" data-lighting="lightsEnabled" role="switch" disabled><span class="toggle-track" aria-hidden="true"></span><span><strong>Bật đèn</strong><small>Đèn quét, chùm sáng và đèn chớp sân khấu</small></span></label>
+            <label class="lighting-field">Phối màu<select data-lighting="lightsPalette" disabled></select></label>
+            <label class="lighting-field">Độ sáng <output data-lighting-output="lightsBrightness"></output><input type="range" min="0" max="2" step="0.05" data-lighting="lightsBrightness" disabled></label>
+            <label class="lighting-field">Độ rộng chùm sáng <output data-lighting-output="beamWidth"></output><input type="range" min="0.5" max="4" step="0.1" data-lighting="beamWidth" disabled></label>
+        </div>
+        <div class="card"><div class="card-header"><h2 class="card-title">Phối cảnh nhanh</h2></div><p class="help">Áp dụng cùng lúc màu sàn, nền và đèn. Giữ nguyên các công tắc bật/tắt.</p><div id="lighting-presets" class="lighting-presets"></div><p id="lighting-message" class="help" role="status" aria-live="polite">Đang chờ máy chủ…</p><p class="help">Thả thanh trượt để lưu. Độ sáng 100% là mức chuẩn; tối đa 200%. Nhịp hiệu ứng dùng BPM cấu hình của game.</p></div>
     </div>
 </section>
 
@@ -454,6 +483,7 @@
     </article>
 </template>
 
+<script src="lighting.js"></script>
 <script src="control.js"></script>
 </body>
 </html>

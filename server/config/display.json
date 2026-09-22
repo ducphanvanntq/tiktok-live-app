@@ -1,4 +1,17 @@
 {
+  "lighting": {
+    "floorEnabled": true,
+    "backgroundEnabled": true,
+    "lightsEnabled": true,
+    "floorBrightness": 1.5,
+    "backgroundBrightness": 1.25,
+    "lightsBrightness": 1.5,
+    "beamWidth": 2.5,
+    "floorPalette": 3,
+    "backgroundPalette": 1,
+    "lightsPalette": 3,
+    "floorPattern": 0
+  },
   "showTop": true,
   "showWelcome": true,
   "showChat": true,

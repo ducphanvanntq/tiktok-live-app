@@ -2,6 +2,12 @@ name: Build Windows
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Tên phiên bản gói ZIP (để trống để tự lấy từ repo)'
+        type: string
+        required: false
+        default: ''
   # release.yml goi lai workflow nay. Tach ra vi `paths:` o duoi ap dung cho
   # ca tag push, nen neu nhet tag vao chinh trigger nay thi ban release se bi
   # bo qua khi commit duoc tag khong dung toi cac duong dan do.

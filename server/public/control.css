@@ -882,3 +882,13 @@ kbd {
 .display-switch input:focus-visible + .toggle-track { outline: 2px solid var(--success); outline-offset: 4px; }
 .display-switch input:disabled ~ span { opacity: 0.55; }
 .display-settings [role="status"] { margin-top: 14px; min-height: 1.5em; }
+
+/* Live stage lighting */
+.lighting-field { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin: 20px 0; font-size: 14px; }
+.lighting-field select, .lighting-field input { grid-column: 1 / -1; width: 100%; }
+.lighting-field select { color: #eee5ff; background: #201b2b; border: 1px solid #776389; border-radius: 8px; padding: 12px; }
+.lighting-field input[type=range] { accent-color: #c3a4ff; }
+.lighting-field output { color: #c3a4ff; font-variant-numeric: tabular-nums; }
+.lighting-presets { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+.lighting-presets .btn { border: 1px solid #aa83c5; color: #e8d6ff; }
+.lighting-field :disabled, .lighting-presets :disabled { opacity: .45; cursor: not-allowed; }

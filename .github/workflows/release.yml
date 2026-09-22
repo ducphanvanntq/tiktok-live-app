@@ -5,28 +5,73 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version release, ví dụ v1.0.6 (sẽ tạo tag nếu chưa có)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Đánh dấu bản phát hành là pre-release'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
 
 jobs:
+  prepare:
+    name: Validate release version and source
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate version and existing tag
+        id: release
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?$ ]]; then
+            echo '::error::Use a version such as v1.0.6 or v1.0.6-rc.1.'
+            exit 1
+          fi
+          if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            if [[ "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" != "$(git rev-parse HEAD)" ]]; then
+              echo '::error::Existing tag points to another commit. Select that tag or use a new version.'
+              exit 1
+            fi
+          fi
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo '::error::Release already exists. Use a new version.'
+            exit 1
+          fi
+          echo "version=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
   windows:
+    needs: prepare
     # Dung chung dung mot duong build voi CI thuong, khong chep lai cau hinh.
     uses: ./.github/workflows/build-windows.yml
     with:
-      version: ${{ github.ref_name }}
+      version: ${{ needs.prepare.outputs.version }}
     # Job Unity can UNITY_EMAIL / UNITY_PASSWORD.
     secrets: inherit
 
   macos:
+    needs: prepare
     uses: ./.github/workflows/build-macos.yml
     with:
-      version: ${{ github.ref_name }}
+      version: ${{ needs.prepare.outputs.version }}
     secrets: inherit
 
   publish:
     name: Publish GitHub Release
-    needs: [windows, macos]
+    needs: [prepare, windows, macos]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -46,12 +91,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.version }}
+          RELEASE_PRERELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
         run: |
           ls -la dist
-          gh release create "$GITHUB_REF_NAME" dist/*.zip \
-            --title "$GITHUB_REF_NAME" \
-            --notes-file - \
-            --verify-tag <<'NOTES'
+          args=("$RELEASE_TAG" dist/*.zip --title "$RELEASE_TAG" --notes-file -)
+          if [[ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]]; then
+            args+=(--verify-tag)
+          else
+            args+=(--target "$GITHUB_SHA")
+          fi
+          if [[ "$RELEASE_PRERELEASE" == "true" ]]; then args+=(--prerelease); fi
+          gh release create "${args[@]}" <<'NOTES'
           ## Tai ve
 
           - **Windows 10/11 (64-bit)** — `WangnguenBrigde-Live-Windows-*.zip`
@@ -59,6 +110,9 @@ jobs:
 
           Giai nen TOAN BO file ZIP ra mot thu muc moi roi chay `run.bat` (Windows)
           hoac `run.command` (macOS). Khong chay truc tiep ben trong ZIP.
+
+          Bản này có tab **Sân khấu & đèn** trong Control Panel để bật/tắt sàn LED,
+          nền và đèn, đổi sáu phối màu, độ sáng đến 200% và độ rộng chùm sáng.
 
           > Ban macOS **chua duoc ky so**. Lan dau chay, mo Terminal tai thu muc vua
           > giai nen va chay `xattr -dr com.apple.quarantine .` — xem chi tiet trong

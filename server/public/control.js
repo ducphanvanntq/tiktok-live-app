@@ -11,6 +11,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
         btn.classList.add('active');
         document.getElementById('tab-' + btn.dataset.tab)?.classList.add('active');
+        history.replaceState(null, '', '#' + btn.dataset.tab);
     });
 });
 
@@ -64,6 +65,7 @@ let displayReady = false;
 let displayTimer;
 
 function renderDisplay(config, message = 'Đã đồng bộ cài đặt hiển thị.') {
+    renderLighting(config?.lighting, message);
     clearTimeout(displayTimer);
     displayReady = true;
     for (const input of displayInputs) {
@@ -75,6 +77,7 @@ function renderDisplay(config, message = 'Đã đồng bộ cài đặt hiển t
 }
 
 function lockDisplay(message) {
+    lockLighting(message);
     displayReady = false;
     clearTimeout(displayTimer);
     for (const input of displayInputs) {
@@ -97,6 +100,8 @@ for (const input of displayInputs) input.addEventListener('change', () => {
     // Reconnect to obtain the saved state if the acknowledgment is lost.
     displayTimer = setTimeout(() => socket.close(), 8000);
 });
+
+[...document.querySelectorAll('.tab-btn')].find(btn => btn.dataset.tab === location.hash.slice(1))?.click();
 
 /* ═══ WEBSOCKET ══════════════════════════════════════════ */
 function send(message) {

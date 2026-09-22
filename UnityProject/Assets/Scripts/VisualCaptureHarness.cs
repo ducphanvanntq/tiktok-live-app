@@ -36,6 +36,12 @@ namespace TikTokLiveGame
         {
             if (welcomeDirectory != null)
             {
+                if (Array.IndexOf(Environment.GetCommandLineArgs(), "-ledFloorPreview") >= 0)
+                {
+                    LedFloorCaptureHarness ledPreview = root.AddComponent<LedFloorCaptureHarness>();
+                    ledPreview.StartCoroutine(ledPreview.Capture(welcomeDirectory));
+                    return;
+                }
                 if (Array.IndexOf(Environment.GetCommandLineArgs(), "-displaySettingsPreview") >= 0)
                 {
                     DisplaySettingsCaptureHarness displayPreview = root.AddComponent<DisplaySettingsCaptureHarness>();

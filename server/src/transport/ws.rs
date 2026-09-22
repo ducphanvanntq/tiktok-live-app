@@ -285,7 +285,7 @@ async fn dispatch(
             let path = state.paths.config_dir.join("display.json");
             let temporary = state.paths.config_dir.join("display.json.tmp");
             let saved = async {
-                let json = serde_json::to_string_pretty(&next).expect("boolean display config");
+                let json = serde_json::to_string_pretty(&next).expect("validated display config");
                 tokio::fs::write(&temporary, format!("{json}\n")).await?;
                 tokio::fs::rename(&temporary, &path).await
             }.await;

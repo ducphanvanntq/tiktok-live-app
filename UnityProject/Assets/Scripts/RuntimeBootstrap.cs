@@ -25,7 +25,8 @@ namespace TikTokLiveGame
 
             GameObject root = new("TikTok Live Game");
             AvatarService avatars = root.AddComponent<AvatarService>();
-            TikTokWebSocketClient client = welcomeDirectory == null ? root.AddComponent<TikTokWebSocketClient>() : null;
+            bool ledDemo = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-ledFloorDemo") >= 0;
+            TikTokWebSocketClient client = welcomeDirectory == null && !ledDemo ? root.AddComponent<TikTokWebSocketClient>() : null;
             PlayerManager players = new GameObject("Players").AddComponent<PlayerManager>();
             players.transform.SetParent(root.transform);
             GiftEffectManager giftEffects = root.AddComponent<GiftEffectManager>();
@@ -33,6 +34,7 @@ namespace TikTokLiveGame
             TikTokGameController game = root.AddComponent<TikTokGameController>();
             game.Initialize(client, players, giftEffects);
             VisualCaptureHarness.InstallIfRequested(root, welcomeDirectory);
+            StageLightingCaptureHarness.InstallIfRequested(root);
         }
     }
 }

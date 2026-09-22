@@ -44,6 +44,10 @@ if [ -z "$version" ]; then
 fi
 version="${version#v}"
 version="${version:-0.0}"
+if [[ ! "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+    echo "ERROR: version chi duoc chua chu, so, dau cham, gach ngang va gach duoi." >&2
+    exit 1
+fi
 
 name="WangnguenBrigde-Live-macOS-v$version"
 stage="$OUT_DIR/$name"

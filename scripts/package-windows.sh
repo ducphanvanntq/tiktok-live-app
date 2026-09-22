@@ -23,7 +23,8 @@ find_newest() {
     local name="$1"
     find "$SEARCH_ROOT" \
         \( -path '*/UnityProject/Library' -o -path '*/UnityProject/Temp' \
-           -o -path '*/server/target/debug' -o -path '*/node_modules' \
+           -o -path '*/server/target/debug' -o -path '*/UnityProject/Logs' \
+           -o -path '*/node_modules' \
            -o -path "$OUT_DIR" \) -prune -o \
         -type f -name "$name" -printf '%T@\t%p\n' 2>/dev/null \
         | sort -rn | head -1 | cut -f2-
@@ -37,7 +38,20 @@ if [ -z "$player_exe" ]; then
 fi
 player_dir="$(cd "$(dirname "$player_exe")" && pwd)"
 
-server_exe="$(find_newest "$SERVER_EXE_NAME")"
+# Prefer the release binary explicitly. Runtime logs and preview captures can
+# contain copied debug servers; letting their timestamp win would ship the
+# wrong binary when packaging locally after an integration test.
+server_exe=""
+for candidate in \
+    "$SEARCH_ROOT/server/target/release/$SERVER_EXE_NAME" \
+    "$SEARCH_ROOT/artifacts/server/$SERVER_EXE_NAME" \
+    "$SEARCH_ROOT/Server/$SERVER_EXE_NAME"; do
+    if [ -f "$candidate" ]; then
+        server_exe="$candidate"
+        break
+    fi
+done
+server_exe="${server_exe:-$(find_newest "$SERVER_EXE_NAME")}"
 if [ -z "$server_exe" ]; then
     echo "ERROR: khong tim thay $SERVER_EXE_NAME duoi $SEARCH_ROOT" >&2
     echo "       Chay build.bat, hoac: cargo build --release --manifest-path server/Cargo.toml" >&2
@@ -56,6 +70,10 @@ if [ -z "$version" ]; then
 fi
 version="${version#v}"
 version="${version:-0.0}"
+if [[ ! "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+    echo "ERROR: version chi duoc chua chu, so, dau cham, gach ngang va gach duoi." >&2
+    exit 1
+fi
 
 name="WangnguenBrigde-Live-Windows-v$version"
 stage="$OUT_DIR/$name"

@@ -18,6 +18,11 @@ async function until(predicate) {
 
 for (const kind of ['node', 'rust']) test(`${kind}: display switches broadcast, reject unauthorized writes, survive reconnect/reset/restart`,
     { timeout: 60000, skip: kind === 'rust' && !process.env.RUST_SERVER_BINARY }, async () => {
+    const expected = switches => kind === 'rust' ? { ...switches, lighting: {
+        floorEnabled: true, backgroundEnabled: true, lightsEnabled: true,
+        floorBrightness: 1.5, backgroundBrightness: 1.25, lightsBrightness: 1.5,
+        beamWidth: 2.5, floorPalette: 3, backgroundPalette: 1, lightsPalette: 3, floorPattern: 0,
+    } } : switches;
     const listener = net.createServer();
     listener.listen(0, '127.0.0.1'); await once(listener, 'listening');
     const port = listener.address().port;
@@ -65,7 +70,7 @@ for (const kind of ['node', 'rust']) test(`${kind}: display switches broadcast, 
         const overlay = await connect('overlay');
         const second = await connect('control');
         assert.deepEqual(overlay.messages.find(m => m.type === 'display_config').display,
-            enabled);
+            expected(enabled));
         overlay.send({ type: 'display_update', patch: { showTop: false } });
         await until(() => overlay.messages.find(m => m.type === 'error'));
         for (const field of Object.keys(enabled)) {
@@ -73,7 +78,7 @@ for (const kind of ['node', 'rust']) test(`${kind}: display switches broadcast, 
             await until(() => overlay.messages.find(m => m.type === 'display_config' && m.display[field] === false));
             await until(() => second.messages.find(m => m.type === 'display_config' && m.display[field] === false));
         }
-        const disabled = Object.fromEntries(Object.keys(enabled).map(key => [key, false]));
+        const disabled = expected(Object.fromEntries(Object.keys(enabled).map(key => [key, false])));
         assert.deepEqual(JSON.parse(await fs.readFile(configFile, 'utf8')), disabled);
         control.send({ type: 'display_update', patch: { showTop: 'false' } });
         await until(() => control.messages.find(m => m.type === 'display_error'));

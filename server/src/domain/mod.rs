@@ -6,6 +6,7 @@
 pub mod event;
 pub mod points;
 pub mod display;
+pub mod lighting;
 pub mod gifts;
 pub mod rules;
 pub mod text;

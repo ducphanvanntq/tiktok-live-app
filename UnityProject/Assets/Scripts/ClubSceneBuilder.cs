@@ -163,6 +163,9 @@ namespace TikTokLiveGame
             }
             clubRoot.transform.position = new Vector3(0, 0, -12f);
 
+            // The dance floor stays under the crowd, outside the rear rig's offset.
+            LedDanceFloor.Create();
+
             // Keep the stage in front of the backdrop at z = -12.5.
             // The lighting rig's offset would otherwise hide both the video and the DJ.
             CreateRaisedStage();
@@ -175,6 +178,7 @@ namespace TikTokLiveGame
             AddLight("Hell Red Light", new Vector3(-6f, 7f, 1f), new Color(1f, 0.1f, 0.1f), 4.8f, 20f);
             AddLight("Hell Orange Light", new Vector3(6f, 7f, 0f), new Color(1f, 0.4f, 0f), 4.6f, 20f);
             AddLight("Stage Demon Light", new Vector3(0f, 8f, -7f), new Color(0.8f, 0f, 0.2f), 5.8f, 23f);
+            new GameObject("Stage Lighting Controls").AddComponent<StageLighting>();
         }
 
         private static void CreateRaisedStage()
