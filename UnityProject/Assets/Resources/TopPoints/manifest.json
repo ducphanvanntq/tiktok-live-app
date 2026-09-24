@@ -1,0 +1,179 @@
+{
+  "version": 1,
+  "textures": [
+    {
+      "resource": "top3-panel",
+      "width": 1510,
+      "height": 1041,
+      "sha256": "3012cfc372b69d100206e0a462959d4991219ce92e4eedcc029386f9bf57be79",
+      "frames": [
+        {
+          "id": "panel",
+          "rect": [
+            63,
+            90,
+            1390,
+            850
+          ],
+          "border": [
+            110,
+            100,
+            110,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "resource": "rank-avatar-atlas",
+      "width": 1536,
+      "height": 1024,
+      "sha256": "c6ed4712e3cdb74a285dad8f496e4696b11326ec30d6a537536dac639bd4ab23",
+      "frames": [
+        {
+          "id": "rank-1",
+          "rect": [
+            103,
+            60,
+            340,
+            450
+          ],
+          "border": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "rank-2",
+          "rect": [
+            608,
+            139,
+            327,
+            371
+          ],
+          "border": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "rank-3",
+          "rect": [
+            1108,
+            152,
+            336,
+            358
+          ],
+          "border": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "avatar-ring-1",
+          "rect": [
+            63,
+            544,
+            416,
+            406
+          ],
+          "border": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "avatar-ring-2",
+          "rect": [
+            562,
+            544,
+            412,
+            406
+          ],
+          "border": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "avatar-ring-3",
+          "rect": [
+            1056,
+            542,
+            417,
+            409
+          ],
+          "border": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "resource": "support-atlas",
+      "width": 1254,
+      "height": 1254,
+      "sha256": "5dafcb260d0fd4c776487881ae061e1c5e554af178b8d7696ccd1433d9745afe",
+      "frames": [
+        {
+          "id": "champion-row",
+          "rect": [
+            29,
+            259,
+            580,
+            164
+          ],
+          "border": [
+            84,
+            46,
+            84,
+            46
+          ]
+        },
+        {
+          "id": "divider",
+          "rect": [
+            689,
+            326,
+            521,
+            39
+          ],
+          "border": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "avatar-fallback",
+          "rect": [
+            127,
+            773,
+            373,
+            373
+          ],
+          "border": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    }
+  ]
+}

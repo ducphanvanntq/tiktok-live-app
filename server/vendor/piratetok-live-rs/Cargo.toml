@@ -1,0 +1,81 @@
+# VENDORED COPY — see VENDOR-PATCH.md for why this exists and what was changed.
+# Upstream: https://github.com/PirateTok/live-rs (crates.io piratetok-live-rs 0.2.1)
+# Trimmed to a lib-only target: the crate's bins, examples and tests are not vendored.
+
+[package]
+edition = "2021"
+name = "piratetok-live-rs"
+version = "0.2.1"
+authors = ["Zmole Cristian"]
+build = "build.rs"
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+description = "TikTok Live WebSocket connector — real-time chat, gifts, likes, and viewer events. No authentication required."
+homepage = "https://piratetok.boats"
+documentation = "https://docs.rs/piratetok-live-rs"
+readme = "README.md"
+license = "0BSD"
+repository = "https://github.com/PirateTok/live-rs"
+
+[lib]
+name = "piratetok_live_rs"
+path = "src/lib.rs"
+
+[dependencies.base64]
+version = "0.22"
+
+[dependencies.flate2]
+version = "1"
+
+[dependencies.futures-util]
+version = "0.3"
+
+[dependencies.http]
+version = "1"
+
+[dependencies.prost]
+version = "0.14"
+
+[dependencies.rand]
+version = "0.9"
+
+[dependencies.reqwest]
+version = "0.12"
+features = [
+    "native-tls",
+    "json",
+]
+default-features = false
+
+[dependencies.serde]
+version = "1"
+features = ["derive"]
+
+[dependencies.serde_json]
+version = "1"
+
+[dependencies.thiserror]
+version = "2"
+
+[dependencies.tokio]
+version = "1"
+features = [
+    "rt-multi-thread",
+    "macros",
+    "sync",
+    "time",
+    "signal",
+]
+
+[dependencies.tokio-tungstenite]
+version = "0.26"
+features = ["native-tls"]
+
+[dependencies.tracing]
+version = "0.1"
+
+[dependencies.urlencoding]
+version = "2"

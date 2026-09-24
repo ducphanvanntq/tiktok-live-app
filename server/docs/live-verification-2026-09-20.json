@@ -1,0 +1,129 @@
+{
+  "date": "2026-09-20",
+  "timezone": "Asia/Bangkok",
+  "rustTests": 89,
+  "nodeWireTests": 30,
+  "nodeWireSkipped": 0,
+  "build": "dev PASS",
+  "clippy": "PASS",
+  "finalTestedBinarySha256": "33de1ee078bef8e9794d6c6316590240b196a93e6737905eab6686534ecc52a3",
+  "sessions": [
+    {
+      "username": "pinkydollreal",
+      "mode": "live",
+      "startedAt": "2026-09-20T01:09:50.815Z",
+      "finishedAt": "2026-09-20T01:12:54.402Z",
+      "result": "PASS",
+      "counts": {
+        "member": 468,
+        "chat": 155,
+        "like": 127,
+        "gift": 24,
+        "follow": 28,
+        "share": 88
+      },
+      "totals": {
+        "likes": 1311,
+        "diamonds": 721
+      },
+      "pointsChecks": 157,
+      "snapshotChecks": 7,
+      "manualLiveReconnect": false,
+      "duplicates": 0,
+      "errors": [],
+      "unobservedEvents": [],
+      "artifactDirectory": "UnityProject/Logs/real-live-Vbg0J6"
+    },
+    {
+      "username": "pinkydollreal",
+      "mode": "live",
+      "startedAt": "2026-09-20T01:18:09.581Z",
+      "finishedAt": "2026-09-20T01:19:15.035Z",
+      "result": "PASS",
+      "counts": {
+        "member": 154,
+        "chat": 40,
+        "like": 15,
+        "gift": 9,
+        "follow": 7,
+        "share": 29
+      },
+      "totals": {
+        "likes": 71,
+        "diamonds": 443
+      },
+      "pointsChecks": 27,
+      "snapshotChecks": 5,
+      "manualLiveReconnect": true,
+      "duplicates": 0,
+      "errors": [],
+      "unobservedEvents": [],
+      "artifactDirectory": "UnityProject/Logs/real-live-cX46ST"
+    },
+    {
+      "username": "olachat.net",
+      "mode": "offline",
+      "startedAt": "2026-09-20T01:16:36.211Z",
+      "finishedAt": "2026-09-20T01:16:37.550Z",
+      "result": "PASS",
+      "counts": {
+        "member": 0,
+        "chat": 0,
+        "like": 0,
+        "gift": 0,
+        "follow": 0,
+        "share": 0
+      },
+      "totals": {
+        "likes": 0,
+        "diamonds": 0
+      },
+      "pointsChecks": 0,
+      "snapshotChecks": 0,
+      "manualLiveReconnect": false,
+      "duplicates": 0,
+      "errors": [],
+      "unobservedEvents": [
+        "member",
+        "chat",
+        "like",
+        "gift",
+        "follow",
+        "share"
+      ],
+      "artifactDirectory": "UnityProject/Logs/real-live-TlecK1"
+    },
+    {
+      "username": "pinkydollreal",
+      "mode": "live",
+      "startedAt": "2026-09-20T01:20:47.551Z",
+      "finishedAt": "2026-09-20T01:21:53.428Z",
+      "result": "PASS",
+      "counts": {
+        "member": 140,
+        "chat": 25,
+        "like": 46,
+        "gift": 18,
+        "follow": 3,
+        "share": 15
+      },
+      "totals": {
+        "likes": 573,
+        "diamonds": 294
+      },
+      "pointsChecks": 64,
+      "snapshotChecks": 5,
+      "manualLiveReconnect": true,
+      "duplicates": 0,
+      "errors": [],
+      "unobservedEvents": [],
+      "artifactDirectory": "UnityProject/Logs/real-live-vyqEQ1"
+    }
+  ],
+  "limits": [
+    "No chat, likes, gifts, follows or shares were sent to TikTok; observed public events only.",
+    "Live end, dropped network, stale provider and blocked handshake were verified synthetically, not triggered on the public stream.",
+    "No multi-hour soak, age-restricted room or crash recovery of points was tested.",
+    "The running release server was not replaced."
+  ]
+}

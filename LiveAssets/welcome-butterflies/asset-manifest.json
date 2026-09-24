@@ -1,0 +1,258 @@
+{
+  "status": "integrated",
+  "generator": "built-in image_gen",
+  "atlas": {
+    "file": "butterfly-flap-atlas.png",
+    "width": 1254,
+    "height": 1254,
+    "mode": "RGBA",
+    "sha256": "ee8e0786732f85d5b8c9bc6d495d1d18f77b384a561538da880c97a361146efb",
+    "transparentPixelFraction": 0.894779,
+    "frameOrder": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "frames": [
+      {
+        "index": 0,
+        "name": "open",
+        "rectTopLeft": [
+          0,
+          0,
+          627,
+          627
+        ],
+        "contentBoundsInCellTopLeft": [
+          213,
+          257,
+          526,
+          547
+        ],
+        "suggestedPivotUnityNormalized": [
+          0.589314,
+          0.358852
+        ]
+      },
+      {
+        "index": 1,
+        "name": "half_closing",
+        "rectTopLeft": [
+          627,
+          0,
+          627,
+          627
+        ],
+        "contentBoundsInCellTopLeft": [
+          201,
+          252,
+          400,
+          546
+        ],
+        "suggestedPivotUnityNormalized": [
+          0.479266,
+          0.363636
+        ]
+      },
+      {
+        "index": 2,
+        "name": "closed",
+        "rectTopLeft": [
+          0,
+          627,
+          627,
+          627
+        ],
+        "contentBoundsInCellTopLeft": [
+          319,
+          140,
+          418,
+          430
+        ],
+        "suggestedPivotUnityNormalized": [
+          0.587719,
+          0.545455
+        ]
+      },
+      {
+        "index": 3,
+        "name": "half_opening",
+        "rectTopLeft": [
+          627,
+          627,
+          627,
+          627
+        ],
+        "contentBoundsInCellTopLeft": [
+          201,
+          142,
+          400,
+          436
+        ],
+        "suggestedPivotUnityNormalized": [
+          0.479266,
+          0.539075
+        ]
+      }
+    ],
+    "notes": "Use supplied custom pivots to compensate for generated art placement. Verify flap alignment in game."
+  },
+  "preview": {
+    "file": "color-themes-preview.png",
+    "type": "static_design_reference"
+  },
+  "proposedMotion": {
+    "butterflyCount": 12,
+    "maxButterflies": 16,
+    "randomInitialFlapPhase": true,
+    "entranceSeconds": 0.3,
+    "holdSeconds": 2,
+    "exitSeconds": 0.4,
+    "placement": "random_lower_screen_per_welcome",
+    "avoidAvatarAndText": false,
+    "flapFramesPerSecondRange": [
+      9,
+      16
+    ],
+    "flight": "Per-viewer random edge distribution, start positions and flutter/loop/swoop patterns. Independent bounded B-splines close to and over card edges; consecutive distributions and dominant patterns do not repeat.",
+    "trail": "0.8 second tapered glow ribbon and drifting four-point sparkles.",
+    "layering": "Card background, then butterflies flying over the edges, then avatar/name/subtitle to preserve readability.",
+    "maximumFlockTextureDraws": 132
+  },
+  "proposedThemes": [
+    {
+      "id": "leaf",
+      "background": "#0D2114",
+      "border": "#A3E635",
+      "text": "#FFC5DD",
+      "butterflies": [
+        "#BEF264",
+        "#FF94C2",
+        "#FFE8AE"
+      ]
+    },
+    {
+      "id": "orchid",
+      "background": "#241033",
+      "border": "#D8A4FF",
+      "text": "#AFFFE1",
+      "butterflies": [
+        "#D8A4FF",
+        "#FF9ADD",
+        "#AEFFE1"
+      ]
+    },
+    {
+      "id": "lagoon",
+      "background": "#08262E",
+      "border": "#67E8F9",
+      "text": "#FFD69E",
+      "butterflies": [
+        "#67E8F9",
+        "#B9A3FF",
+        "#FFE4B0"
+      ]
+    },
+    {
+      "id": "rose",
+      "background": "#321527",
+      "border": "#FF83BA",
+      "text": "#C6ECFF",
+      "butterflies": [
+        "#FF99CE",
+        "#C8B0FF",
+        "#B5ECFF"
+      ]
+    },
+    {
+      "id": "midnight",
+      "background": "#111F3C",
+      "border": "#819AFF",
+      "text": "#FFD8EF",
+      "butterflies": [
+        "#92ACFF",
+        "#FEA6D6",
+        "#D9D1FF"
+      ]
+    },
+    {
+      "id": "amber",
+      "background": "#302013",
+      "border": "#FFBE6B",
+      "text": "#B9F6EF",
+      "butterflies": [
+        "#FFD279",
+        "#FF9FB6",
+        "#B9F6EF"
+      ]
+    },
+    {
+      "id": "jade",
+      "background": "#0D2C28",
+      "border": "#6BE4BC",
+      "text": "#F5C5FF",
+      "butterflies": [
+        "#79F0C9",
+        "#DFC0FF",
+        "#F9D88D"
+      ]
+    },
+    {
+      "id": "violet",
+      "background": "#201641",
+      "border": "#A995FF",
+      "text": "#FFE998",
+      "butterflies": [
+        "#C6A2FF",
+        "#FFF0A6",
+        "#FFABD1"
+      ]
+    },
+    {
+      "id": "wine",
+      "background": "#32131B",
+      "border": "#F58B9B",
+      "text": "#C6F7C1",
+      "butterflies": [
+        "#FF97B5",
+        "#FFD09B",
+        "#C6F7C1"
+      ]
+    },
+    {
+      "id": "ocean",
+      "background": "#102C43",
+      "border": "#67B7FF",
+      "text": "#FFD3AD",
+      "butterflies": [
+        "#7DCFFF",
+        "#AFACFF",
+        "#FFD3AD"
+      ]
+    },
+    {
+      "id": "copper",
+      "background": "#321B14",
+      "border": "#F0A17D",
+      "text": "#D7CEFF",
+      "butterflies": [
+        "#FFC895",
+        "#DBB8FF",
+        "#FFABBC"
+      ]
+    },
+    {
+      "id": "moss",
+      "background": "#252A12",
+      "border": "#D8E879",
+      "text": "#AEEFFF",
+      "butterflies": [
+        "#DFEE8A",
+        "#A6EBFF",
+        "#F4A8D6"
+      ]
+    }
+  ],
+  "themeSelection": "Shuffle all 12 coordinated palettes before reusing one; avoid repeats across shuffle boundaries. Name, border, background and butterflies use separate colors. Name/background contrast exceeds 4.5:1."
+}

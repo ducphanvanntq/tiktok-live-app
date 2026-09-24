@@ -1,0 +1,16 @@
+Tool: built-in image_gen
+Edit target: olachat-background-v2.png
+Output: olachat-background-v3.png
+Installed into game as: Build/olachat2.png
+
+Final prompt:
+Edit the supplied OlaChat green nightclub background into a GAME CAMERA SAFE version. Keep the same portrait 9:16 aspect ratio, premium green neon social club style, green #7CB342 and deep forest green architecture, subtle pink accents, symmetrical front-facing interior, side chat bubble symbols, reflective empty dance floor. This is a texture placed on a giant wall and the game's camera crops away the TOP THIRD and left/right outer quarters. The prior upper signs are invisible in-game. Solve this by MOVING ALL LETTERING MUCH LOWER AND MAKING THE SIGNAGE NARROWER.
+
+Critical measurable layout in the FULL OUTPUT IMAGE:
+- Top 0% through 38% of height: ONLY decorative architecture and lights. ABSOLUTELY NO WORDS OR LETTERING up there. Remove the old signs from those locations and replace with ceiling/wall architecture. This tall empty overhead space is intentional crop allowance.
+- One compact standalone dark plaque with hot pink neon text EXACTLY "OLACHAT.NET". Its ENTIRE plaque must be inside x=30%-70%, y=40%-45% of the whole image. Center it at y=42.5%. Pink #FF4081 legible bold sans-serif, restrained glow.
+- Below it a SEPARATE dark green sign with bold white/ivory Vietnamese text EXACTLY two lines "MẠNG XÃ HỘI" then "VIỆT NAM". Its ENTIRE plaque must be inside x=29%-71%, y=47%-55%. Correct Vietnamese diacritics. Clearly separated from domain plaque by a visible gap.
+- These two signs are integrated onto the LOWER central back wall, just above a low stage whose floor line is at y=60%. Place the signs within the central portal, not up at ceiling level.
+- Bottom 60%-100%: empty reflective dance floor for live game characters, low clutter. Rework perspective and stage depth to support this lower visual center.
+Both signs small relative to the full texture but thick high-contrast readable typography because game zooms into center. Keep all text tightly within CENTRAL 42% of width; do NOT stretch across frame. The upper empty architecture and lower-positioned signs are essential, even if it looks unusual as a standalone poster.
+No people, no DJ, no foreground equipment, no added words, no duplicate domain, no watermarks. Do not preserve old high text positioning.

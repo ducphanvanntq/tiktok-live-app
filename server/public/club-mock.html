@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>AFTERHOURS — Sàn nhảy & ánh sáng</title>
+  <link rel="stylesheet" href="club-mock.css">
+  <script src="club-mock.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="club-mock.html" aria-label="Afterhours"><span class="brand-icon">a<span>h</span></span><span>AFTERHOURS<small>VIRTUAL CLUB EXPERIENCE</small></span></a>
+    <nav aria-label="Màn hình hiện tại"><span class="nav-active">Sân khấu</span><span class="nav-note">Lighting studio</span></nav>
+    <div class="demo-badge"><i></i> BẢN XEM THỬ <span>01</span></div>
+  </header>
+  <main>
+    <div class="page-heading"><div><p class="eyebrow">YOUR ROOM. YOUR RHYTHM.</p><h1>Đêm nay, sàn là của bạn<span>.</span></h1><p>Một chút neon. Một chút âm nhạc. Một không gian đầy năng lượng.</p></div><button id="fullscreen" class="outline-button"><span aria-hidden="true">⛶</span> Toàn màn hình</button></div>
+    <div class="studio">
+      <section class="preview" aria-label="Mô phỏng sàn nhảy">
+        <canvas id="club" aria-label="Sàn LED phối cảnh với bục DJ, người nhảy và đèn chuyển động"></canvas>
+        <div class="scene-top"><span class="preview-tag"><i></i> STAGE PREVIEW</span><span class="scene-number">CAM 01 <b> / </b> WIDE</span></div>
+        <div class="scene-title"><span class="scene-eyebrow">WELCOME TO THE NIGHT</span><h2>AFTER<br>HOURS<span>®</span></h2><p>WHERE THE LIGHT MEETS THE BEAT</p></div>
+        <div class="scene-bottom"><div><span class="track-icon" aria-hidden="true">♫</span><div><small>NHỊP MÔ PHỎNG · KHÔNG PHÁT ÂM THANH</small><strong>Midnight energy <span> / </span> <b id="bpm-label">120 BPM</b></strong></div></div><button id="pause" aria-label="Tạm dừng chuyển động" title="Tạm dừng chuyển động">Ⅱ</button></div>
+        <div class="scene-footer"><span><i></i> <b id="look-label">NEON NIGHTS</b></span><span>LED FLOOR <b>×</b> MOVING HEADS <b>×</b> LASER</span></div>
+      </section>
+      <aside class="controls" aria-label="Điều khiển ánh sáng">
+        <div class="panel-heading"><div><p class="eyebrow">SET THE MOOD</p><h2>Ánh sáng & sàn nhảy</h2></div><span class="sliders-icon" aria-hidden="true">☷</span></div>
+        <section class="control-section"><div class="section-heading"><h3>Không khí</h3><span>01 / PRESET</span></div><div class="presets" role="group" aria-label="Chọn phối màu"><button class="preset active" data-preset="neon" aria-pressed="true"><span class="swatch neon"></span><strong>Neon Nights</strong><small>Tím điện · Xanh cyan</small><span class="check">✓</span></button><button class="preset" data-preset="ember" aria-pressed="false"><span class="swatch ember"></span><strong>Golden Hour</strong><small>Hổ phách · Hồng ấm</small><span class="check">✓</span></button><button class="preset" data-preset="ice" aria-pressed="false"><span class="swatch ice"></span><strong>Ice Club</strong><small>Xanh băng · Trắng</small><span class="check">✓</span></button></div></section>
+        <section class="control-section"><div class="section-heading"><h3>Sàn LED</h3><span>02 / FLOOR</span></div><div class="segmented" role="group" aria-label="Hiệu ứng sàn"><button data-pattern="wave" class="active" aria-pressed="true">Làn sóng</button><button data-pattern="checker" aria-pressed="false">Ô cờ</button><button data-pattern="ripple" aria-pressed="false">Lan tỏa</button></div><label class="range-label" for="brightness">Độ sáng <output id="brightness-value">80%</output></label><input id="brightness" type="range" min="0" max="100" value="80" style="--value:80%"></section>
+        <section class="control-section"><div class="section-heading"><h3>Hệ thống đèn</h3><span>03 / LIGHTS</span></div><label class="toggle-row"><span><strong>Đèn quét sân khấu</strong><small>Chùm sáng chuyển động mềm</small></span><input id="beams" type="checkbox" checked><span class="switch"></span></label><label class="toggle-row"><span><strong>Laser & bụi sáng</strong><small>Thêm chiều sâu cho không gian</small></span><input id="lasers" type="checkbox" checked><span class="switch"></span></label><label class="toggle-row"><span><strong>Khách trên sàn</strong><small>Mô phỏng không khí buổi live</small></span><input id="crowd" type="checkbox" checked><span class="switch"></span></label><label class="range-label" for="tempo">Tốc độ chuyển động <output id="tempo-value">120 BPM</output></label><input id="tempo" type="range" min="60" max="160" value="120" style="--value:60%"></section>
+        <button id="drop" class="drop-button"><span aria-hidden="true">✦</span> Thử hiệu ứng DROP <span aria-hidden="true">↗</span></button><p class="panel-note" id="status" role="status">Chọn một mood và nhìn sân khấu đổi màu.</p>
+      </aside>
+    </div>
+    <footer class="page-footer"><span><span class="footer-dot"></span> Thiết kế cho những buổi live không ngủ.</span><span>CONCEPT 01 <b>/</b> INTERACTIVE MOCKUP</span></footer>
+  </main>
+</body>
+</html>

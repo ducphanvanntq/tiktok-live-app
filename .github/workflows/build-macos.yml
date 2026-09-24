@@ -1,0 +1,209 @@
+name: Build macOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Tên phiên bản gói ZIP (để trống để tự lấy từ repo)'
+        type: string
+        required: false
+        default: ''
+  workflow_call:
+    inputs:
+      version:
+        description: Version stamped into the package name (empty = derive from the repo)
+        type: string
+        required: false
+        default: ''
+  push:
+    branches: [main]
+    paths:
+      - 'UnityProject/**'
+      - 'server/**'
+      - 'TikTokBridge/assets/**'
+      - 'DJ_MUSIC/**'
+      - 'DJ_VIDEO/**'
+      - 'LiveAssets/DJ_GIF/**'
+      - 'run.command'
+      - 'scripts/package-macos.sh'
+      - '.github/workflows/build-macos.yml'
+
+concurrency:
+  group: build-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unity:
+    name: Unity StandaloneOSX
+    # The mac-mono editor image cross-builds the .app from Linux, which is far
+    # cheaper than a macOS runner. Signing would need a real Mac, but this
+    # release ships unsigned.
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
+          df -h /
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: UnityProject/Library
+          key: Library-OSX-${{ hashFiles('UnityProject/Assets/**', 'UnityProject/Packages/**', 'UnityProject/ProjectSettings/**') }}
+          restore-keys: |
+            Library-OSX-
+            Library-
+
+      - name: Build player
+        uses: game-ci/unity-builder@v6
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.2.10f1
+          targetPlatform: StandaloneOSX
+          projectPath: UnityProject
+          # Produces TikTokBarGame.app. Universal (Intel + Apple silicon) comes
+          # from platformArchitecture.Standalone: 2 in ProjectSettings.asset.
+          buildName: TikTokBarGame
+          versioning: None
+          allowDirtyBuild: true
+
+      - name: Restore ownership
+        run: |
+          sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE"
+          find "$GITHUB_WORKSPACE" -name 'TikTokBarGame.app' -maxdepth 4 -print
+
+      # upload-artifact flattens permissions and follows symlinks, which breaks
+      # an .app bundle. Tar it first so the package job gets it back intact.
+      - name: Tar the bundle
+        run: |
+          cd build/StandaloneOSX
+          tar -czf "$GITHUB_WORKSPACE/TikTokBarGame.app.tar.gz" TikTokBarGame.app
+
+      - name: Upload player
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-app-macos
+          path: TikTokBarGame.app.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload Unity build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-build-log-macos
+          path: |
+            UnityProject/build*.log
+            /home/runner/work/_temp/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  server:
+    name: Rust server (universal)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add both Apple targets
+        run: |
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          rustc --version
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+
+      - name: Build
+        run: |
+          cargo build --release --manifest-path server/Cargo.toml --target aarch64-apple-darwin
+          cargo build --release --manifest-path server/Cargo.toml --target x86_64-apple-darwin
+
+      - name: Test
+        run: cargo test --release --manifest-path server/Cargo.toml
+
+      - name: Merge into a universal binary
+        run: |
+          lipo -create -output tiktok-server \
+            server/target/aarch64-apple-darwin/release/tiktok-server \
+            server/target/x86_64-apple-darwin/release/tiktok-server
+          lipo -archs tiktok-server
+          chmod +x tiktok-server
+
+      - name: Upload server binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiktok-server-macos
+          path: tiktok-server
+          if-no-files-found: error
+          retention-days: 1
+
+  package:
+    name: Package release ZIP
+    needs: [unity, server]
+    # ditto and lipo only exist on macOS.
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: unity-app-macos
+          path: artifacts
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: tiktok-server-macos
+          path: artifacts/server
+
+      - name: Unpack the bundle
+        run: |
+          mkdir -p artifacts/player
+          tar -xzf artifacts/TikTokBarGame.app.tar.gz -C artifacts/player
+          # The artifact round trip drops the executable bit on both.
+          chmod +x artifacts/server/tiktok-server
+          chmod +x "artifacts/player/TikTokBarGame.app/Contents/MacOS/"*
+
+      # Both halves must be universal or the package silently excludes a whole
+      # class of Macs. Fail loudly rather than shipping an arm64-only build.
+      - name: Verify both binaries are universal
+        run: |
+          check() {
+            archs="$(lipo -archs "$1")"
+            echo "$1: $archs"
+            case "$archs" in
+              *arm64*) ;;
+              *) echo "::error::$1 thieu arm64"; exit 1 ;;
+            esac
+            case "$archs" in
+              *x86_64*) ;;
+              *) echo "::error::$1 thieu x86_64"; exit 1 ;;
+            esac
+          }
+          check artifacts/server/tiktok-server
+          check "$(find artifacts/player/TikTokBarGame.app/Contents/MacOS -type f -perm +111 | head -1)"
+
+      - name: Package
+        env:
+          VERSION: ${{ inputs.version }}
+        run: bash scripts/package-macos.sh "$GITHUB_WORKSPACE/artifacts" "$GITHUB_WORKSPACE/dist"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: WangnguenBrigde-Live-macOS
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 14

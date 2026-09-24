@@ -1,0 +1,181 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Tên phiên bản gói ZIP (để trống để tự lấy từ repo)'
+        type: string
+        required: false
+        default: ''
+  # release.yml goi lai workflow nay. Tach ra vi `paths:` o duoi ap dung cho
+  # ca tag push, nen neu nhet tag vao chinh trigger nay thi ban release se bi
+  # bo qua khi commit duoc tag khong dung toi cac duong dan do.
+  workflow_call:
+    inputs:
+      version:
+        description: Version stamped into the package name (empty = derive from the repo)
+        type: string
+        required: false
+        default: ''
+  push:
+    branches: [main]
+    paths:
+      - 'UnityProject/**'
+      - 'server/**'
+      - 'TikTokBridge/assets/**'
+      - 'DJ_MUSIC/**'
+      - 'DJ_VIDEO/**'
+      - 'LiveAssets/DJ_GIF/**'
+      - 'run.bat'
+      - 'build.bat'
+      - 'scripts/package-windows.sh'
+      - '.github/workflows/build-windows.yml'
+
+concurrency:
+  group: build-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unity:
+    name: Unity StandaloneWindows64
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The windows-mono editor image is ~15 GB and the runner ships with only
+      # ~14 GB free on /. Drop the preinstalled SDKs we never use.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
+          df -h /
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: UnityProject/Library
+          key: Library-Windows64-${{ hashFiles('UnityProject/Assets/**', 'UnityProject/Packages/**', 'UnityProject/ProjectSettings/**') }}
+          restore-keys: |
+            Library-Windows64-
+            Library-
+
+      - name: Build player
+        # v4 hard-fails without UNITY_LICENSE or UNITY_SERIAL. Unity dropped
+        # manual .ulf activation for Personal seats, so there is no license file
+        # to supply; v6 wraps game-ci/cli, which acquires a Personal seat from
+        # the licensing service using UNITY_EMAIL/UNITY_PASSWORD instead.
+        uses: game-ci/unity-builder@v6
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.2.10f1
+          targetPlatform: StandaloneWindows64
+          projectPath: UnityProject
+          # Must match the executable name in build.bat and run.bat —
+          # run.bat launches the player by this exact file name.
+          buildName: TikTokBarGame
+          # `Semantic` needs git tags on every build; `None` keeps
+          # bundleVersion from ProjectSettings.asset.
+          versioning: None
+          allowDirtyBuild: true
+
+      # unity-builder runs Unity as root inside the container, so the output and
+      # the Library cache come back owned by root. buildsPath is relative to the
+      # workspace, not to projectPath, so chown the whole tree rather than
+      # guessing where the player landed.
+      - name: Restore ownership
+        run: |
+          sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE"
+          find "$GITHUB_WORKSPACE" -name 'TikTokBarGame.exe' -printf 'player: %p\n'
+
+      - name: Upload player
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-player
+          path: build/
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload Unity build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-build-log
+          path: |
+            UnityProject/build*.log
+            /home/runner/work/_temp/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  server:
+    name: Rust server (x86_64-pc-windows-msvc)
+    # Built natively rather than cross-compiled: piratetok-live-rs runs a
+    # build.rs and links native-tls, which resolves to schannel here.
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          rustc --version
+          cargo --version
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+
+      - name: Build
+        run: cargo build --release --manifest-path server/Cargo.toml
+
+      - name: Test
+        run: cargo test --release --manifest-path server/Cargo.toml
+
+      - name: Upload server binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiktok-server
+          path: server/target/release/tiktok-server.exe
+          if-no-files-found: error
+          retention-days: 1
+
+  package:
+    name: Package release ZIP
+    needs: [unity, server]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Both land under the workspace; package-windows.sh locates them by file
+      # name, so the exact folders below do not matter.
+      - uses: actions/download-artifact@v4
+        with:
+          name: unity-player
+          path: artifacts/player
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: tiktok-server
+          path: artifacts/server
+
+      - name: Package
+        env:
+          VERSION: ${{ inputs.version }}
+        run: bash scripts/package-windows.sh "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/dist"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: WangnguenBrigde-Live-Windows
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 14

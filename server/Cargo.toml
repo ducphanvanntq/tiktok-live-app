@@ -1,0 +1,43 @@
+[package]
+name = "tiktok-server"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.85"
+description = "TikTok Live Game Server — cầu nối TikTok Live sang overlay game Unity"
+authors = ["wangnguen <wangnguenlc79@gmail.com>"]
+license = "MIT"
+publish = false
+
+[dependencies]
+# TikTok Live — thay cho tiktok-live-connector (npm).
+# Dùng bản vendor đã patch, xem vendor/piratetok-live-rs/VENDOR-PATCH.md.
+piratetok-live-rs = "0.2.1"
+
+axum = { version = "0.8", features = ["ws"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync", "time", "fs"] }
+tower-http = { version = "0.6", features = ["fs", "set-header"] }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
+futures-util = "0.3"
+
+unicode-normalization = "0.1"
+url = "2"
+uuid = { version = "1", features = ["v4"] }
+rand = "0.9"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+
+# Bản vendor sửa lỗi build.rs không chạy được trên Windows (upstream issue #1).
+[patch.crates-io]
+piratetok-live-rs = { path = "vendor/piratetok-live-rs" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
